@@ -2,6 +2,16 @@
 
 Zeitraum: **4.–6. Dezember 2026**. Mobile Anmeldeseite, Zeitwünsche, Änderungen, persönlicher Fixplan und Admin-Dienstplan.
 
+## Zeitfenster für Helfer:innen
+
+- **Freitag, 04.12.2026:** 13:00–23:00 Uhr
+- **Samstag, 05.12.2026:** 14:00–23:00 Uhr
+- **Sonntag, 06.12.2026:** 13:00–23:00 Uhr
+
+Helfer:innen geben ihre tatsächlich verfügbaren Teilzeiten innerhalb dieser Tagesfenster an. Die Webseite zeigt diese Zeiten im Kopfbereich und direkt an den Eingabefeldern; zusätzliche Prüfungen verhindern die Speicherung außerhalb des Fensters über die Weboberfläche. Bestehende ältere Einteilungen werden nicht eigenmächtig verändert, sondern bei abweichenden Zeiten in der Adminoberfläche markiert.
+
+
+
 ## Architektur
 - `index.html`: öffentliche Oberfläche über GitHub Pages (ohne Google-Balken)
 - `config.js`: Adresse der Google-Apps-Script-Webapp (kein Passwort hineinschreiben!)

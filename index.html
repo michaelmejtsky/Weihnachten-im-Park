@@ -216,6 +216,42 @@ var DAYS=[{id:'2026-12-04',name:'Freitag',short:'Fr, 04.12'},{id:'2026-12-05',na
 var slots=[], person=null, adminKey=sessionStorage.getItem('wip26_admin')||'', adminData={people:[],shifts:[]}, editShiftId='';
 function el(id){return document.getElementById(id)}
 function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function normalDate(value){
+ var s=String(value==null?'':value).trim();
+ if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;
+ var german=s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+ if(german)return german[3]+'-'+german[2]+'-'+german[1];
+ var english=s.match(/\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})\s+(\d{4})\b/);
+ if(english){
+  var months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return english[3]+'-'+String(months.indexOf(english[1])+1).padStart(2,'0')+'-'+english[2].padStart(2,'0');
+ }
+ var d=new Date(s);
+ if(!isNaN(d.getTime())){
+  var bits=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Vienna',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d);
+  var out={};bits.forEach(function(bit){out[bit.type]=bit.value});
+  return out.year+'-'+out.month+'-'+out.day;
+ }
+ return s;
+}
+function normalTime(value){
+ var s=String(value==null?'':value).trim();
+ if(/^([01]\d|2[0-3]):[0-5]\d$/.test(s))return s;
+ var old=s.match(/\b([01]\d|2[0-3]):([0-5]\d):\d{2}\s+GMT/);
+ if(old)return old[1]+':'+old[2];
+ if(typeof value==='number'&&value>=0&&value<1){
+  var mins=Math.round(value*1440);
+  return String(Math.floor(mins/60)%24).padStart(2,'0')+':'+String(mins%60).padStart(2,'0');
+ }
+ var simple=s.match(/^([01]\d|2[0-3]):([0-5]\d):\d{2}$/);
+ if(simple)return simple[1]+':'+simple[2];
+ return s;
+}
+function normalShift(shift){
+ var s=Object.assign({},shift);
+ s.date=normalDate(s.date);s.from=normalTime(s.from);s.to=normalTime(s.to);
+ return s;
+}
 function dayName(id){return (DAYS.find(function(d){return d.id===id})||{}).short||id}
 function status(where,message,kind){el(where).innerHTML=message?'<div class="notice '+(kind||'')+'" style="margin-top:14px">'+esc(message)+'</div>':''}
 function show(tab){
@@ -291,7 +327,7 @@ async function loadMine(){
   var r=await call('mine',person);el('myActions').hidden=false;loadMyForm(r.person);
   var html='<div class="card"><h3>Hallo '+esc(r.person.name)+'! 👋</h3>';
   if(!r.shifts.length)html+='<p>Deine Verfügbarkeit ist erfasst. <strong>Du hast noch keine veröffentlichte fixe Einteilung.</strong></p>';
-  else html+='<p>Diese Dienste sind für dich <strong>fix veröffentlicht</strong>:</p>'+r.shifts.sort(function(a,b){return (a.date+a.from).localeCompare(b.date+b.from)}).map(function(s){return '<div class="planentry"><strong>'+esc(dayName(s.date))+'</strong><span>'+esc(s.from)+'–'+esc(s.to)+' Uhr</span><span>'+esc(s.role)+'</span></div>'}).join('');
+  else html+='<p>Diese Dienste sind für dich <strong>fix veröffentlicht</strong>:</p>'+r.shifts.map(normalShift).sort(function(a,b){return (a.date+a.from).localeCompare(b.date+b.from)}).map(function(s){return '<div class="planentry"><strong>'+esc(dayName(s.date))+'</strong><span>'+esc(s.from)+'–'+esc(s.to)+' Uhr</span><span>'+esc(s.role)+'</span></div>'}).join('');
   el('myStatus').innerHTML=html+'</div>';
  }catch(ex){el('myStatus').innerHTML='<div class="notice bad">'+esc(ex.message)+'</div>';el('myActions').hidden=true}
 }
@@ -305,7 +341,7 @@ el('copyPrivate').addEventListener('click',async function(){
 async function loadPlan(){
  el('planList').innerHTML='<div class="empty">Der veröffentlichte Plan wird geladen …</div>';
  try{
-  var r=await call('public',{}),arr=r.plan||[];
+  var r=await call('public',{}),arr=(r.plan||[]).map(normalShift);
   if(!arr.length){el('planList').innerHTML='<div class="empty">Der fixe Dienstplan ist noch nicht veröffentlicht. Trag gerne schon deine verfügbaren Zeiten ein! 🎄</div>';return}
   el('planList').innerHTML=DAYS.map(function(d){var items=arr.filter(function(s){return s.date===d.id});
    return '<div class="card"><div class="spaced"><h3>'+esc(d.name)+', '+esc(d.short.slice(4))+'.2026</h3><span class="pill">'+items.length+' Dienste</span></div>'+
@@ -317,7 +353,7 @@ el('refreshPlan').addEventListener('click',loadPlan);
 async function loadAdmin(){
  if(!adminKey)return;
  status('adminStatus','Lade Helfer und Einteilungen …');
- try{var r=await call('adminList',{adminKey:adminKey});adminData={people:r.people||[],shifts:r.shifts||[]};el('adminLogin').hidden=true;el('adminDashboard').hidden=false;status('adminStatus','');renderAdmin()}
+ try{var r=await call('adminList',{adminKey:adminKey});adminData={people:r.people||[],shifts:(r.shifts||[]).map(normalShift)};el('adminLogin').hidden=true;el('adminDashboard').hidden=false;status('adminStatus','');renderAdmin()}
  catch(ex){status('adminStatus',ex.message,'bad');if(/Admin-Schlüssel falsch/.test(ex.message)){adminKey='';sessionStorage.removeItem('wip26_admin');el('adminLogin').hidden=false;el('adminDashboard').hidden=true}}
 }
 el('loginButton').addEventListener('click',function(){adminKey=el('adminKey').value.trim();if(!adminKey){status('adminStatus','Admin-Schlüssel eingeben.','bad');return}sessionStorage.setItem('wip26_admin',adminKey);loadAdmin()});

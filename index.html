@@ -132,7 +132,7 @@ footer{text-align:center;font-size:12px;color:#758779;padding:12px 18px 32px}
     </div>
     <h1>Weihnachten<br>im Park <span style="color:#edc46d">✳</span></h1>
     <p>Unsere Käsehütte braucht wieder helfende Hände – da wird selbst der Grinch fast weich! 💚 Trag ein, wann du Zeit hast. Die fixe Einteilung findest du später genau hier.</p>
-    <div class="dates"><div class="datepill">Fr · 04. Dezember<span class="hours">13:00–23:00 Uhr</span></div><div class="datepill">Sa · 05. Dezember<span class="hours">14:00–23:00 Uhr</span></div><div class="datepill">So · 06. Dezember<span class="hours">13:00–23:00 Uhr</span></div></div>
+    <div class="dates"><div class="datepill">Fr · 04. Dezember<span class="hours">13:00–23:00 Uhr</span></div><div class="datepill">Sa · 05. Dezember<span class="hours">14:00–23:00 Uhr</span></div><div class="datepill">So · 06. Dezember<span class="hours">13:00–23:00 Uhr</span></div><div class="datepill">Mo · 07. Dezember<span class="hours">Abbau ab 07:30 Uhr</span></div></div>
   </div>
 </header>
 <nav class="navwrap"><div class="wrap tabs" role="tablist" aria-label="Navigation">
@@ -145,7 +145,7 @@ footer{text-align:center;font-size:12px;color:#758779;padding:12px 18px 32px}
 <section class="panel active" id="melden">
  <div class="sectiontag">Helfer-Anmeldung</div><h2>Wann kannst du helfen?</h2>
  <p class="intro">Ob eine Stunde oder ein ganzer Abend – jede Unterstützung zählt. Du kannst mehrere Zeitfenster pro Tag angeben.</p>
- <div class="time-guide"><strong>🕓 Zeiträume für die Helfereinteilung:</strong> Freitag 13–23 Uhr · Samstag 14–23 Uhr · Sonntag 13–23 Uhr. Gib bitte nur die Stunden an, zu denen du wirklich helfen kannst.</div>
+ <div class="time-guide"><strong>🕓 Zeiträume für die Helfereinteilung:</strong> Freitag 13–23 Uhr · Samstag 14–23 Uhr · Sonntag 13–23 Uhr · <strong>Montag, 07.12.: Abbau ab 07:30 Uhr</strong> (Ende offen). Die Feuerwehr freut sich über Unterstützung – viele Hände, schnelles Ende! Gib bitte nur die Stunden an, zu denen du wirklich helfen kannst.</div>
  <div id="setupAlert"></div>
  <form id="signupForm" class="card">
   <div class="fieldgrid">
@@ -193,8 +193,8 @@ footer{text-align:center;font-size:12px;color:#758779;padding:12px 18px 32px}
     <form id="shiftForm">
      <div class="field"><label for="shiftPerson">Helfer:in</label><select id="shiftPerson" required><option value="">Bitte wählen</option></select></div>
      <div class="fieldgrid">
-      <div class="field"><label for="shiftDate">Tag</label><select id="shiftDate"><option value="2026-12-04">Fr, 04.12. (13–23 Uhr)</option><option value="2026-12-05">Sa, 05.12. (14–23 Uhr)</option><option value="2026-12-06">So, 06.12. (13–23 Uhr)</option></select></div>
-      <div class="field"><label for="shiftRole">Bereich</label><select id="shiftRole"><option>Käsehütte</option><option>Verkauf</option><option>Ausgabe</option><option>Vorbereitung</option><option>Aufbau / Abbau</option></select></div>
+      <div class="field"><label for="shiftDate">Tag</label><select id="shiftDate"><option value="2026-12-04">Fr, 04.12. (13–23 Uhr)</option><option value="2026-12-05">Sa, 05.12. (14–23 Uhr)</option><option value="2026-12-06">So, 06.12. (13–23 Uhr)</option><option value="2026-12-07">Mo, 07.12. (Abbau ab 07:30)</option></select></div>
+      <div class="field"><label for="shiftRole">Bereich</label><select id="shiftRole"><option>Käsehütte</option><option>Verkauf</option><option>Ausgabe</option><option>Vorbereitung</option><option>Aufbau / Abbau</option><option>Abbauarbeiten</option></select></div>
       <div class="field"><label for="shiftFrom">Von</label><input id="shiftFrom" type="time" min="13:00" max="23:00" required></div>
       <div class="field"><label for="shiftTo">Bis</label><input id="shiftTo" type="time" min="13:00" max="23:00" required></div>
      </div>
@@ -203,7 +203,8 @@ footer{text-align:center;font-size:12px;color:#758779;padding:12px 18px 32px}
     </form>
    </div>
    <div class="card"><h3>Bisherige Einteilungen</h3><div id="adminShifts"></div></div>
-   <div class="card"><h3>Verfügbarkeiten & Wünsche</h3><div id="adminPeople"></div></div>
+   <div class="card"><h3>Verfügbarkeiten & Wünsche</h3><div id="adminPeople"></div></div><div class="card" id="notesCard"><h3>📝 Notizen & Aufgaben</h3><p class="mini">Nur für dich im Adminbereich.</p><form id="noteForm"><div class="field"><label>Titel</label><input id="noteTitle" required maxlength="120"></div><div class="field"><label>Notiz</label><textarea id="noteBody" maxlength="3000"></textarea></div><div class="field"><label>Status</label><select id="noteState"><option>Offen</option><option>Erledigt</option></select></div><div class="actions"><button class="btn primary" type="submit">Notiz speichern</button><button class="btn outline" type="button" id="noteClear">Neu</button></div></form><div id="notesList"></div></div>
+<div class="card" id="inventoryCard"><h3>📦 Inventar & Einkauf</h3><p class="mini">Bestände und was noch besorgt werden muss.</p><form id="inventoryForm"><div class="field"><label>Artikel</label><input id="itemTitle" required maxlength="120"></div><div class="fieldgrid"><div class="field"><label>Kategorie</label><select id="itemCategory"><option>Lebensmittel</option><option>Getränke</option><option>Material</option><option>Sonstiges</option></select></div><div class="field"><label>Status</label><select id="itemStatus"><option>Besorgen</option><option>Bestellt</option><option>Vorhanden</option></select></div><div class="field"><label>Menge</label><input id="itemAmount" inputmode="decimal"></div><div class="field"><label>Einheit</label><input id="itemUnit" maxlength="35"></div></div><div class="field"><label>Anmerkung</label><textarea id="itemNotes" maxlength="600"></textarea></div><div class="actions"><button class="btn primary" type="submit">Inventar speichern</button><button class="btn outline" type="button" id="inventoryClear">Neu</button></div></form><div id="inventoryList"></div></div>
  </div>
  <div id="adminStatus" aria-live="polite"></div>
 </section>
@@ -213,8 +214,8 @@ footer{text-align:center;font-size:12px;color:#758779;padding:12px 18px 32px}
 (function(){
 'use strict';
 var API=String(window.WIP_API_URL||'').trim();
-var DAYS=[{id:'2026-12-04',name:'Freitag',short:'Fr, 04.12',start:'13:00',end:'23:00'},{id:'2026-12-05',name:'Samstag',short:'Sa, 05.12',start:'14:00',end:'23:00'},{id:'2026-12-06',name:'Sonntag',short:'So, 06.12',start:'13:00',end:'23:00'}];
-var slots=[], person=null, adminKey=sessionStorage.getItem('wip26_admin')||'', adminData={people:[],shifts:[]}, editShiftId='';
+var DAYS=[{id:'2026-12-04',name:'Freitag',short:'Fr, 04.12',start:'13:00',end:'23:00'},{id:'2026-12-05',name:'Samstag',short:'Sa, 05.12',start:'14:00',end:'23:00'},{id:'2026-12-06',name:'Sonntag',short:'So, 06.12',start:'13:00',end:'23:00'},{id:'2026-12-07',name:'Montag',short:'Mo, 07.12',start:'07:30',end:'23:59',teardown:true}];
+var slots=[], person=null, adminKey=sessionStorage.getItem('wip26_admin')||'', adminData={people:[],shifts:[],notes:[],inventory:[]}, editShiftId='',editNoteId='',editInventoryId='';
 function el(id){return document.getElementById(id)}
 function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function normalDate(value){
@@ -255,7 +256,7 @@ function normalShift(shift){
 }
 function dayName(id){return (DAYS.find(function(d){return d.id===id})||{}).short||id}
 function validSlot(s){var d=DAYS.find(function(x){return x.id===s.date});var pattern=/^([01][0-9]|2[0-3]):[0-5][0-9]$/;return !!(d&&pattern.test(s.from||'')&&pattern.test(s.to||'')&&s.from>=d.start&&s.to<=d.end&&s.from<s.to)}
-function windowLabel(date){var d=DAYS.find(function(x){return x.id===date});return d?(d.name+' ('+d.start+'–'+d.end+' Uhr)'):'dem Veranstaltungszeitraum'}
+function windowLabel(date){var d=DAYS.find(function(x){return x.id===date});return d?(d.teardown?'Montag (Abbau ab 07:30 Uhr)':d.name+' ('+d.start+'–'+d.end+' Uhr)'):'dem Veranstaltungszeitraum'}
 function status(where,message,kind){el(where).innerHTML=message?'<div class="notice '+(kind||'')+'" style="margin-top:14px">'+esc(message)+'</div>':''}
 function show(tab){
  document.querySelectorAll('.tab').forEach(function(x){x.classList.toggle('active',x.dataset.tab===tab)});
@@ -296,7 +297,7 @@ function restore(){
 function dayRender(){
  el('daySlots').innerHTML=DAYS.map(function(d){
   var idx=slots.map(function(s,i){return s.date===d.id?i:-1}).filter(function(i){return i>=0});
-  return '<div class="daycard"><div class="dayhead"><div class="daytitle">'+d.name+' <small>'+esc(d.short)+'.2026</small><span class="opening-label">'+d.start+'–'+d.end+' Uhr</span></div><button class="btn secondary small" type="button" data-add="'+d.id+'">+ Zeitfenster</button></div>'+
+  return '<div class="daycard"><div class="dayhead"><div class="daytitle">'+d.name+' <small>'+esc(d.short)+'.2026</small><span class="opening-label">'+(d.teardown?'Abbau ab 07:30 Uhr · Ende offen':d.start+'–'+d.end+' Uhr')+'</span></div><button class="btn secondary small" type="button" data-add="'+d.id+'">+ Zeitfenster</button></div>'+
    '<div class="slots">'+(idx.length?idx.map(function(i){var s=slots[i];return '<div class="slot">'+
    '<div><label>Von</label><input type="time" data-slot="'+i+'" data-key="from" value="'+esc(s.from)+'" min="'+d.start+'" max="'+d.end+'" aria-label="Beginn"></div>'+
    '<div><label>Bis</label><input type="time" data-slot="'+i+'" data-key="to" value="'+esc(s.to)+'" min="'+d.start+'" max="'+d.end+'" aria-label="Ende"></div>'+
@@ -356,7 +357,7 @@ el('refreshPlan').addEventListener('click',loadPlan);
 async function loadAdmin(){
  if(!adminKey)return;
  status('adminStatus','Lade Helfer und Einteilungen …');
- try{var r=await call('adminList',{adminKey:adminKey});adminData={people:r.people||[],shifts:(r.shifts||[]).map(normalShift)};el('adminLogin').hidden=true;el('adminDashboard').hidden=false;status('adminStatus','');renderAdmin()}
+ try{var r=await call('adminList',{adminKey:adminKey});adminData={people:r.people||[],shifts:(r.shifts||[]).map(normalShift),notes:r.notes||[],inventory:r.inventory||[]};el('adminLogin').hidden=true;el('adminDashboard').hidden=false;status('adminStatus','');renderAdmin()}
  catch(ex){status('adminStatus',ex.message,'bad');if(/Admin-Schlüssel falsch/.test(ex.message)){adminKey='';sessionStorage.removeItem('wip26_admin');el('adminLogin').hidden=false;el('adminDashboard').hidden=true}}
 }
 el('loginButton').addEventListener('click',function(){adminKey=el('adminKey').value.trim();if(!adminKey){status('adminStatus','Admin-Schlüssel eingeben.','bad');return}sessionStorage.setItem('wip26_admin',adminKey);loadAdmin()});
@@ -372,6 +373,8 @@ function renderAdmin(){
   (p.note?'<p class="mini"><strong>Wunsch:</strong> '+esc(p.note)+'</p>':'')+
   '<button type="button" class="btn secondary small" data-person="'+esc(p.id)+'">Für Dienst auswählen</button></div>'
  }).join('');
+ el('notesList').innerHTML=(adminData.notes||[]).length?adminData.notes.map(function(n){return '<div class="person"><strong>'+esc(n.title)+'</strong> · '+esc(n.status)+'<p>'+esc(n.text)+'</p><button class="btn outline small" data-editnote="'+esc(n.id)+'">Bearbeiten</button> <button class="btn danger small" data-deletenote="'+esc(n.id)+'">Löschen</button></div>'}).join(''):'<p class="mini">Noch keine Notizen.</p>';
+ el('inventoryList').innerHTML=(adminData.inventory||[]).length?adminData.inventory.map(function(i){return '<div class="person"><strong>'+esc(i.item)+'</strong> · '+esc(i.status)+'<div class="mini">'+esc(i.quantity)+' '+esc(i.unit)+' · '+esc(i.category)+'</div><p>'+esc(i.note)+'</p><button class="btn outline small" data-edititem="'+esc(i.id)+'">Bearbeiten</button> <button class="btn danger small" data-deleteitem="'+esc(i.id)+'">Löschen</button></div>'}).join(''):'<p class="mini">Noch keine Inventareinträge.</p>';
  if(!shifts.length)el('adminShifts').innerHTML='<div class="empty">Noch keine Einteilungen angelegt.</div>';
  else el('adminShifts').innerHTML=shifts.slice().sort(function(a,b){return (a.date+a.from).localeCompare(b.date+b.from)}).map(function(s){
   var p=ppl.find(function(x){return x.id===s.personId});
@@ -411,6 +414,16 @@ async function publish(yes){
 el('publishBtn').addEventListener('click',function(){publish(true)});
 el('unpublishBtn').addEventListener('click',function(){publish(false)});
 el('adminRefresh').addEventListener('click',loadAdmin);
+
+function clearNote(){editNoteId='';el('noteForm').reset()}
+function clearInventory(){editInventoryId='';el('inventoryForm').reset()}
+el('noteClear').addEventListener('click',clearNote);
+el('inventoryClear').addEventListener('click',clearInventory);
+el('noteForm').addEventListener('submit',async function(e){e.preventDefault();try{await call('saveNote',{adminKey,id:editNoteId,title:el('noteTitle').value,text:el('noteBody').value,status:el('noteState').value});clearNote();await loadAdmin();status('adminStatus','Notiz gespeichert.','good')}catch(err){status('adminStatus',err.message,'bad')}});
+el('inventoryForm').addEventListener('submit',async function(e){e.preventDefault();try{await call('saveInventory',{adminKey,id:editInventoryId,item:el('itemTitle').value,category:el('itemCategory').value,quantity:el('itemAmount').value,unit:el('itemUnit').value,status:el('itemStatus').value,note:el('itemNotes').value});clearInventory();await loadAdmin();status('adminStatus','Inventar gespeichert.','good')}catch(err){status('adminStatus',err.message,'bad')}});
+el('notesList').addEventListener('click',async function(e){var b=e.target.closest('button');if(!b)return;var n=adminData.notes.find(x=>x.id===(b.dataset.editnote||b.dataset.deletenote));if(!n)return;if(b.dataset.editnote){editNoteId=n.id;el('noteTitle').value=n.title;el('noteBody').value=n.text;el('noteState').value=n.status;el('notesCard').scrollIntoView({behavior:'smooth'})}else if(confirm('Notiz löschen?')){try{await call('deleteNote',{adminKey,id:n.id});await loadAdmin()}catch(err){status('adminStatus',err.message,'bad')}}});
+el('inventoryList').addEventListener('click',async function(e){var b=e.target.closest('button');if(!b)return;var item=adminData.inventory.find(x=>x.id===(b.dataset.edititem||b.dataset.deleteitem));if(!item)return;if(b.dataset.edititem){editInventoryId=item.id;el('itemTitle').value=item.item;el('itemCategory').value=item.category;el('itemAmount').value=item.quantity;el('itemUnit').value=item.unit;el('itemStatus').value=item.status;el('itemNotes').value=item.note;el('inventoryCard').scrollIntoView({behavior:'smooth'})}else if(confirm('Inventareintrag löschen?')){try{await call('deleteInventory',{adminKey,id:item.id});await loadAdmin()}catch(err){status('adminStatus',err.message,'bad')}}});
+
 restore();dayRender();
 if(!API)el('setupAlert').innerHTML='<div class="notice">⚙️ Die Webapp-Oberfläche ist bereit. Die Anmeldung wird erst nach der Verknüpfung mit Google Apps Script freigeschaltet.</div>';
 })();

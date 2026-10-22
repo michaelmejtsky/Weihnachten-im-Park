@@ -35,3 +35,19 @@ Helfer senden Verfügbarkeiten und Wünsche ohne Konto, erhalten auf demselben G
 **Datenschutz:** Personen mit dem Anmelde-Link können den veröffentlichten Dienstplan sehen. Namen werden nur angezeigt, wenn die jeweilige Person beim Eintragen ausdrücklich zugestimmt hat; sonst steht „Helfer:in“. Telefonnummern und Notizen stehen nur im Adminbereich. Das Backend benötigt die öffentliche Apps-Script-Webapp; bitte nicht den Google-Sheet-Link oder den Admin-Schlüssel in der WhatsApp-Gruppe teilen. Verfügbarkeit ist keine automatische fixe Zusage.
 
 **Hinweis:** Ohne Script-Bereitstellung und URL in `config.js` ist die Seite nur eine Vorschau und nimmt keine Anmeldungen entgegen. GitHub Pages braucht möglicherweise wenige Minuten zum Aktualisieren.
+
+## Erweiterung Oktober 2026 – Abbau, Notizen und Inventar
+
+- Montag, **7. Dezember 2026**, Abbauarbeiten **ab 07:30 Uhr**, kein festgelegtes Veranstaltungsende. Freiwillige Unterstützung für die Feuerwehr: „Viele Hände, schnelles Ende“.
+- Helfer:innen können für den Abbautag ein voraussichtliches Zeitfenster ab 07:30 Uhr angeben; die technische Tagesgrenze 23:59 Uhr ist kein angekündigtes Enddatum/-zeit.
+- Im geschützten Bereich **Verwaltung** gibt es **Notizen & Aufgaben** (Titel, Text, offen/erledigt) und **Inventar & Einkauf** (Artikel, Kategorie, Menge, Einheit, Status, Anmerkung).
+- Die Daten werden in den Tabellen **Notizen** und **Inventar** desselben Google Sheets gespeichert, nicht öffentlich angezeigt.
+
+### Nach Backend-Änderungen unbedingt aktualisieren
+
+1. Aktuellen Inhalt von `Code.gs` vollständig in **dem bereits bestehenden** Google-Apps-Script-Projekt ersetzen (keinen zweiten Google-Apps-Script-Dienst anlegen).
+2. **Speichern**, Funktion **`setupWIP` einmal ausführen** (bestehender Admin-Schlüssel bleibt dabei unverändert).
+3. **Bereitstellen → Bereitstellungen verwalten → Web-App bearbeiten (Stiftsymbol) → Version: Neue Version → Bereitstellen**. Nicht nur speichern: Die bestehende `/exec`-URL läuft andernfalls weiter mit der alten Version.
+4. Die GitHub-Webapp aktualisieren und im Adminbereich Notizen/Inventar prüfen. Den privaten Admin-Schlüssel nicht in GitHub hinterlegen.
+
+Hinweis: Die Weboberfläche sperrt Einträge außerhalb der konfigurierten Tagesfenster; die aktualisierte Backend-Version überprüft dies ebenfalls. Bereits vorhandene Schichten werden nicht automatisch überschrieben oder gelöscht.

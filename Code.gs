@@ -239,7 +239,7 @@ function wipSaveNote_(p) {
 function wipSaveInventory_(p) {
   const item=wipCellText_(p.item,120),quantity=wipCellText_(p.quantity,30);
   if(!item)throw Error('Bitte einen Artikel eingeben.');
-  if(quantity && !/^\\d+(?:[,.]\\d+)?$/.test(quantity))throw Error('Menge muss eine Zahl sein, etwa 12 oder 2,5.');
+  if(quantity && !/^\d+(?:[,.]\d+)?$/.test(quantity))throw Error('Menge muss eine Zahl sein, etwa 12 oder 2,5.');
   const categories=['Lebensmittel','Getränke','Material','Sonstiges'];
   const statuses=['Vorhanden','Besorgen','Bestellt'];
   const cat=categories.indexOf(p.category)>=0?p.category:'Sonstiges';

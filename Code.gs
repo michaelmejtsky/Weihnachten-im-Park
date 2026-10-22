@@ -6,10 +6,14 @@
  * Administrator-Schlüssel wird ausschließlich in den Skripteigenschaften gespeichert.
  */
 const WIP_SPREADSHEET_ID = '1-wyGW6BNzV9eq2Xks07e1bieB4dfVa16sSebLN0jE5Q';
-const WIP_DAYS = ['2026-12-04', '2026-12-05', '2026-12-06'];
+const WIP_DAYS = ['2026-12-04', '2026-12-05', '2026-12-06', '2026-12-07'];
+// Montag ist Abbautag ab 07:30 Uhr; 23:59 ist nur die technische Tagesgrenze, KEINE feste Endzeit.
+const WIP_WINDOWS = {'2026-12-04':['13:00','23:00'],'2026-12-05':['14:00','23:00'],'2026-12-06':['13:00','23:00'],'2026-12-07':['07:30','23:59']};
 const WIP_HEADERS = {
   'Anmeldungen': ['ID','Bearbeitungscode','Name','Telefon','Notiz','ImPlanAnzeigen','VerfuegbarkeitJSON','Erstellt','Aktualisiert'],
-  'Einteilungen': ['ID','HelferID','Datum','Von','Bis','Bereich','Hinweis','Veroeffentlicht','Aktualisiert']
+  'Einteilungen': ['ID','HelferID','Datum','Von','Bis','Bereich','Hinweis','Veroeffentlicht','Aktualisiert'],
+  'Notizen': ['ID','Titel','Text','Status','Aktualisiert'],
+  'Inventar': ['ID','Artikel','Kategorie','Menge','Einheit','Status','Notiz','Aktualisiert']
 };
 
 function setupWIP() {
@@ -36,6 +40,7 @@ function setupWIP() {
     // IDs, Dates and times must remain literal strings (not auto-converted to Date).
     if (name === 'Einteilungen') sheet.getRange(2,1,Math.max(1,sheet.getMaxRows()-1),7).setNumberFormat('@');
     if (name === 'Anmeldungen') {sheet.getRange(2,1,Math.max(1,sheet.getMaxRows()-1),5).setNumberFormat('@');sheet.getRange(2,7,Math.max(1,sheet.getMaxRows()-1),1).setNumberFormat('@');}
+    if (name === 'Notizen' || name === 'Inventar') sheet.getRange(2,1,Math.max(1,sheet.getMaxRows()-1),headers.length-1).setNumberFormat('@');
   });
   const props = PropertiesService.getScriptProperties();
   if (!props.getProperty('WIP_ADMIN_KEY')) {
@@ -73,13 +78,17 @@ function wipRequest_(action,p) {
   }
   if (action === 'adminList') {
     wipAdmin_(p);
-    return {ok:true,people:wipPeople_().map(wipAdminPerson_),shifts:wipReadShifts_()};
+    return {ok:true,people:wipPeople_().map(wipAdminPerson_),shifts:wipReadShifts_(),notes:wipReadNotes_(),inventory:wipReadInventory_()};
   }
   if (action === 'signup') return wipLocked_(function(){return wipSignup_(p)});
   if (action === 'saveShift') return wipLocked_(function(){wipAdmin_(p);return wipSaveShift_(p)});
   if (action === 'deleteShift') return wipLocked_(function(){wipAdmin_(p);return wipDeleteShift_(p)});
   if (action === 'publish') return wipLocked_(function(){wipAdmin_(p);return wipPublish_(true)});
   if (action === 'unpublish') return wipLocked_(function(){wipAdmin_(p);return wipPublish_(false)});
+  if (action === 'saveNote') return wipLocked_(function(){wipAdmin_(p);return wipSaveNote_(p)});
+  if (action === 'deleteNote') return wipLocked_(function(){wipAdmin_(p);return wipDeleteRecord_('Notizen',p.id)});
+  if (action === 'saveInventory') return wipLocked_(function(){wipAdmin_(p);return wipSaveInventory_(p)});
+  if (action === 'deleteInventory') return wipLocked_(function(){wipAdmin_(p);return wipDeleteRecord_('Inventar',p.id)});
   throw Error('Unbekannte Aktion.');
 }
 
@@ -109,6 +118,10 @@ function wipDate_(v) {
   if (WIP_DAYS.indexOf(d)<0) throw Error('Datum nicht im Veranstaltungszeitraum.');
   return d;
 }
+function wipCheckWindow_(date,from,to) {
+  const w=WIP_WINDOWS[date];
+  if (!w || from < w[0] || to > w[1] || from>=to) throw Error(date==='2026-12-07'?'Am Montag sind Abbauzeiten ab 07:30 Uhr möglich. Bitte Endzeit nach der Startzeit angeben.':'Zeitfenster außerhalb der Helferzeiten am '+date+': '+(w?w[0]+' bis '+w[1]:'unbekannt')+'.');
+}
 function wipAdmin_(p) {
   const actual=PropertiesService.getScriptProperties().getProperty('WIP_ADMIN_KEY');
   if (!actual) throw Error('Admin-Schlüssel noch nicht erstellt. setupWIP() ausführen.');
@@ -132,7 +145,7 @@ function wipSignup_(p) {
   if (!Array.isArray(p.availability) || !p.availability.length || p.availability.length>18) throw Error('Bitte mindestens eine mögliche Schicht angeben (max. 18).');
   const slots=p.availability.map(x=> {
     const date=wipDate_(x.date),from=wipTime_(x.from),to=wipTime_(x.to);
-    if (from>=to) throw Error('Die Endzeit muss nach der Startzeit liegen.');
+    wipCheckWindow_(date,from,to);
     return {date:date,from:from,to:to};
   });
   let id=wipString_(p.id,80),code=wipString_(p.code,100);
@@ -166,7 +179,7 @@ function wipSaveShift_(p) {
   const person=wipFindPerson_(wipString_(p.personId,80));
   if (!person) throw Error('Helfer nicht gefunden.');
   const date=wipDate_(p.date),from=wipTime_(p.from),to=wipTime_(p.to);
-  if (from>=to) throw Error('Endzeit muss nach der Startzeit liegen.');
+  wipCheckWindow_(date,from,to);
   const id=wipString_(p.shiftId,80),role=wipString_(p.role,60)||'Käsehütte',note=wipString_(p.note,300);
   const all=wipReadShifts_(),prev=id?all.find(x=>x.id===id):null;
   if (id&&!prev) throw Error('Einteilung nicht gefunden.');
@@ -188,4 +201,62 @@ function wipPublish_(state) {
   if (n<1) throw Error('Es gibt noch keine Einteilungen.');
   sh.getRange(2,8,n,1).setValues(Array.from({length:n},()=>[state]));
   return {ok:true,message:state?'Alle Einteilungen wurden fix veröffentlicht.':'Alle Einteilungen sind wieder Entwürfe.'};
+}
+
+
+/** Interne Notizen & Inventar: werden NIE über 'public' oder 'mine' ausgegeben. */
+function wipCellText_(v,n) {
+  const s=wipString_(v,n);
+  // Formeleinschleusung beim Eintragen in Google Sheets unterbinden.
+  return /^[=+@]/.test(s) ? "'"+s : s;
+}
+function wipReadNotes_() {
+  return wipRows_('Notizen').map(r=>({
+    id:String(r.v[0]),title:String(r.v[1]||''),text:String(r.v[2]||''),
+    status:String(r.v[3]||'Offen')
+  }));
+}
+function wipReadInventory_() {
+  return wipRows_('Inventar').map(r=>({
+    id:String(r.v[0]),item:String(r.v[1]||''),category:String(r.v[2]||''),
+    quantity:String(r.v[3]||''),unit:String(r.v[4]||''),
+    status:String(r.v[5]||'Besorgen'),note:String(r.v[6]||'')
+  }));
+}
+function wipSaveNote_(p) {
+  const title=wipCellText_(p.title,120),body=wipCellText_(p.text,3000);
+  if (!title) throw Error('Bitte einen Titel für die Notiz eingeben.');
+  const status=['Offen','Erledigt'].indexOf(p.status)>=0?p.status:'Offen';
+  const id=wipString_(p.id,80), rows=wipRows_('Notizen');
+  const current=id?rows.find(r=>String(r.v[0])===id):null;
+  if(id&&!current)throw Error('Notiz nicht gefunden.');
+  const values=[id||Utilities.getUuid(),title,body,status,new Date()];
+  const sheet=wipSheet_('Notizen');
+  if(current)sheet.getRange(current.row,1,1,values.length).setValues([values]);
+  else sheet.appendRow(values);
+  return {ok:true,message:'Notiz gespeichert.'};
+}
+function wipSaveInventory_(p) {
+  const item=wipCellText_(p.item,120),quantity=wipCellText_(p.quantity,30);
+  if(!item)throw Error('Bitte einen Artikel eingeben.');
+  if(quantity && !/^\\d+(?:[,.]\\d+)?$/.test(quantity))throw Error('Menge muss eine Zahl sein, etwa 12 oder 2,5.');
+  const categories=['Lebensmittel','Getränke','Material','Sonstiges'];
+  const statuses=['Vorhanden','Besorgen','Bestellt'];
+  const cat=categories.indexOf(p.category)>=0?p.category:'Sonstiges';
+  const status=statuses.indexOf(p.status)>=0?p.status:'Besorgen';
+  const unit=wipCellText_(p.unit,35),note=wipCellText_(p.note,600);
+  const id=wipString_(p.id,80),rows=wipRows_('Inventar');
+  const current=id?rows.find(r=>String(r.v[0])===id):null;
+  if(id&&!current)throw Error('Inventareintrag nicht gefunden.');
+  const values=[id||Utilities.getUuid(),item,cat,quantity,unit,status,note,new Date()];
+  const sheet=wipSheet_('Inventar');
+  if(current)sheet.getRange(current.row,1,1,values.length).setValues([values]);
+  else sheet.appendRow(values);
+  return {ok:true,message:'Inventar aktualisiert.'};
+}
+function wipDeleteRecord_(name,id) {
+  const rows=wipRows_(name),target=rows.find(r=>String(r.v[0])===wipString_(id,80));
+  if(!target)throw Error(name+': Eintrag nicht gefunden.');
+  wipSheet_(name).deleteRow(target.row);
+  return {ok:true,message:'Eintrag gelöscht.'};
 }

@@ -89,6 +89,7 @@ function wipRequest_(action,p) {
   if (action === 'deleteNote') return wipLocked_(function(){wipAdmin_(p);return wipDeleteRecord_('Notizen',p.id)});
   if (action === 'saveInventory') return wipLocked_(function(){wipAdmin_(p);return wipSaveInventory_(p)});
   if (action === 'deleteInventory') return wipLocked_(function(){wipAdmin_(p);return wipDeleteRecord_('Inventar',p.id)});
+  if (action === 'setInventoryStatus') return wipLocked_(function(){wipAdmin_(p);return wipSetInventoryStatus_(p)});
   throw Error('Unbekannte Aktion.');
 }
 
@@ -241,7 +242,7 @@ function wipSaveInventory_(p) {
   if(!item)throw Error('Bitte einen Artikel eingeben.');
   if(quantity && !/^\d+(?:[,.]\d+)?$/.test(quantity))throw Error('Menge muss eine Zahl sein, etwa 12 oder 2,5.');
   const categories=['Geräte','Küchenutensilien','Verbrauchsmaterial','Reinigung','Lebensmittel','Getränke','Material','Sonstiges'];
-  const statuses=['Vorhanden','Zu prüfen','Besorgen','Bestellt'];
+  const statuses=['Vorhanden','Zu prüfen','Besorgen','Bestellt','Weitergeleitet','Besorgt'];
   const cat=categories.indexOf(p.category)>=0?p.category:'Sonstiges';
   const status=statuses.indexOf(p.status)>=0?p.status:'Besorgen';
   const unit=wipCellText_(p.unit,35),note=wipCellText_(p.note,600);
@@ -254,6 +255,24 @@ function wipSaveInventory_(p) {
   else sheet.appendRow(values);
   return {ok:true,message:'Inventar aktualisiert.'};
 }
+
+function wipSetInventoryStatus_(p) {
+  const id=wipString_(p.id,80), next=wipString_(p.status,40);
+  if (['Weitergeleitet','Besorgt','Vorhanden'].indexOf(next)<0)
+    throw Error('Unzulässiger Inventarstatus.');
+  const rows=wipRows_('Inventar');
+  const hit=rows.find(r=>String(r.v[0])===id);
+  if(!hit)throw Error('Inventarartikel nicht gefunden. Bitte neu laden.');
+  const current=String(hit.v[5]||'Besorgen');
+  if(current===next)return {ok:true,message:'Status bereits '+next+'.',status:next};
+  if(['Besorgen','Zu prüfen','Bestellt','Weitergeleitet'].indexOf(current)<0)
+    throw Error('Der Eintrag ist bereits abgeschlossen. Bitte zuerst in „Bearbeiten“ zurücksetzen.');
+  const sheet=wipSheet_('Inventar');
+  sheet.getRange(hit.row,6).setNumberFormat('@').setValue(next);
+  sheet.getRange(hit.row,8).setValue(new Date());
+  return {ok:true,message:'„'+String(hit.v[1])+'“ ist jetzt '+next+'.',status:next};
+}
+
 function wipDeleteRecord_(name,id) {
   const rows=wipRows_(name),target=rows.find(r=>String(r.v[0])===wipString_(id,80));
   if(!target)throw Error(name+': Eintrag nicht gefunden.');

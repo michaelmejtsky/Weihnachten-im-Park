@@ -240,8 +240,8 @@ function wipSaveInventory_(p) {
   const item=wipCellText_(p.item,120),quantity=wipCellText_(p.quantity,30);
   if(!item)throw Error('Bitte einen Artikel eingeben.');
   if(quantity && !/^\d+(?:[,.]\d+)?$/.test(quantity))throw Error('Menge muss eine Zahl sein, etwa 12 oder 2,5.');
-  const categories=['Lebensmittel','Getränke','Material','Sonstiges'];
-  const statuses=['Vorhanden','Besorgen','Bestellt'];
+  const categories=['Geräte','Küchenutensilien','Verbrauchsmaterial','Reinigung','Lebensmittel','Getränke','Material','Sonstiges'];
+  const statuses=['Vorhanden','Zu prüfen','Besorgen','Bestellt'];
   const cat=categories.indexOf(p.category)>=0?p.category:'Sonstiges';
   const status=statuses.indexOf(p.status)>=0?p.status:'Besorgen';
   const unit=wipCellText_(p.unit,35),note=wipCellText_(p.note,600);

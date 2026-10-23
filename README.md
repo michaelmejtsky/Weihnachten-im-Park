@@ -51,3 +51,16 @@ Helfer senden Verfügbarkeiten und Wünsche ohne Konto, erhalten auf demselben G
 4. Die GitHub-Webapp aktualisieren und im Adminbereich Notizen/Inventar prüfen. Den privaten Admin-Schlüssel nicht in GitHub hinterlegen.
 
 Hinweis: Die Weboberfläche sperrt Einträge außerhalb der konfigurierten Tagesfenster; die aktualisierte Backend-Version überprüft dies ebenfalls. Bereits vorhandene Schichten werden nicht automatisch überschrieben oder gelöscht.
+
+## Inventar: PDF, Ausdruck und Schnellbestätigung
+
+Im geschützten Bereich **Verwaltung → Inventar & Einkauf** stehen zur Verfügung:
+
+- **PDF herunterladen:** erzeugt einen A4-Inventarauszug aus der aktuell gefilterten Liste (Kategorien, Artikel, Menge, Status, Anmerkungen, Anzahl offener Prüfungen), mit mehrseitiger Gestaltung. Benötigt die jsPDF-Bibliothek über CDN.
+- **Druckansicht:** öffnet einen für A4 gestalteten Bericht. Dort kann gedruckt oder über den Browser **Als PDF speichern** gewählt werden; dies funktioniert auch als Fallback, falls die externe PDF-Bibliothek nicht geladen werden kann.
+- **Schnellbestätigung:** „Weitergeleitet“, „Besorgt“, bei Prüfeinträgen außerdem „Vorhanden bestätigt“. Vor dem Speichern erscheint eine Bestätigung.
+- Statusänderungen benötigen den Admin-Schlüssel. Das Backend schreibt **nur die Statusspalte und den Zeitpunkt**, ohne Menge oder Notizen versehentlich zu überschreiben. Erledigte Einträge bleiben erhalten und können nötigenfalls über Bearbeiten erneut geöffnet werden.
+- Die neuen Status „Weitergeleitet“ und „Besorgt“ werden auch im Formular unterstützt.
+
+**Wichtig:** Die neue Aktion `setInventoryStatus` benötigt ein frisches Apps-Script-Deployment. Deshalb die aktualisierte `Code.gs` speichern und die bestehende Web-App über **Bereitstellungen verwalten → Neue Version → Bereitstellen** aktualisieren. Der reine GitHub-Upload genügt nicht für den neuen Speicher-Endpoint.
+

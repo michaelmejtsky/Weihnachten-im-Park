@@ -58,6 +58,15 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
 .planentry{border-top:1px solid #edf0e9;display:grid;grid-template-columns:minmax(104px,1fr) 1.1fr 1fr;gap:9px;padding:13px 0;font-size:14px;align-items:center}
 .planentry strong{color:#174a30}.pill{display:inline-block;font-size:11px;font-weight:800;border-radius:8px;background:#ecf4ea;color:#25613e;padding:5px 8px}
 .pill.draft{background:#fff1da;color:#835c13}
+.inventory-toolbar{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin:10px 0 17px}
+.inventory-toolbar .btn{min-height:40px}
+.inventory-quick{display:flex;gap:7px;flex-wrap:wrap;margin:9px 0 4px}
+.inventory-quick .btn{font-size:12px;padding:8px 11px;min-height:38px}
+.inventory-confirm{background:#e3f3e8;color:#185a34}
+.inventory-forward{background:#fff1cb;color:#664414}
+.inventory-status-pill{display:inline-block;font-weight:780;font-size:11px;background:#f1f5f0;border-radius:7px;padding:4px 8px}
+.inventory-status-pill.pending{background:#fff0d0;color:#795005}
+.inventory-status-pill.success{background:#e4f5e8;color:#18633b}
 .person{border-top:1px solid var(--line);padding:16px 0}.person:first-child{border-top:0}
 .person .name{font-weight:850;font-size:16px}
 .person .sub{font-size:12px;color:var(--muted);margin:2px 0 8px}
@@ -204,12 +213,13 @@ footer{text-align:center;font-size:12px;color:#758779;padding:12px 18px 32px}
    </div>
    <div class="card"><h3>Bisherige Einteilungen</h3><div id="adminShifts"></div></div>
    <div class="card"><h3>Verfügbarkeiten & Wünsche</h3><div id="adminPeople"></div></div><div class="card" id="notesCard"><h3>📝 Notizen & Aufgaben</h3><p class="mini">Nur für dich im Adminbereich.</p><form id="noteForm"><div class="field"><label>Titel</label><input id="noteTitle" required maxlength="120"></div><div class="field"><label>Notiz</label><textarea id="noteBody" maxlength="3000"></textarea></div><div class="field"><label>Status</label><select id="noteState"><option>Offen</option><option>Erledigt</option></select></div><div class="actions"><button class="btn primary" type="submit">Notiz speichern</button><button class="btn outline" type="button" id="noteClear">Neu</button></div></form><div id="notesList"></div></div>
-<div class="card" id="inventoryCard"><h3>📦 Inventar & Einkauf</h3><p class="mini">Bestände und was noch besorgt werden muss.</p><form id="inventoryForm"><div class="field"><label>Artikel</label><input id="itemTitle" required maxlength="120"></div><div class="fieldgrid"><div class="field"><label>Kategorie</label><select id="itemCategory"><option>Geräte</option><option>Küchenutensilien</option><option>Verbrauchsmaterial</option><option>Reinigung</option><option>Lebensmittel</option><option>Getränke</option><option>Material</option><option>Sonstiges</option></select></div><div class="field"><label>Status</label><select id="itemStatus"><option>Besorgen</option><option>Zu prüfen</option><option>Bestellt</option><option>Vorhanden</option></select></div><div class="field"><label>Menge</label><input id="itemAmount" inputmode="decimal"></div><div class="field"><label>Einheit</label><input id="itemUnit" maxlength="35"></div></div><div class="field"><label>Anmerkung</label><textarea id="itemNotes" maxlength="600"></textarea></div><div class="actions"><button class="btn primary" type="submit">Inventar speichern</button><button class="btn outline" type="button" id="inventoryClear">Neu</button></div></form><hr><div class="fieldgrid"><div class="field"><label for="itemSearch">Inventar durchsuchen</label><input id="itemSearch" type="search" placeholder="Artikel suchen …"></div><div class="field"><label for="itemFilter">Anzeigen</label><select id="itemFilter"><option value="">Alle Artikel</option><option value="Zu prüfen">Zu prüfen</option><option value="Besorgen">Besorgen</option><option value="Bestellt">Bestellt</option><option value="Vorhanden">Vorhanden</option></select></div></div><p id="inventorySummary" class="mini"></p><div id="inventoryList"></div></div>
+<div class="card" id="inventoryCard"><h3>📦 Inventar & Einkauf</h3><p class="mini">Bestände und was noch besorgt werden muss.</p><form id="inventoryForm"><div class="field"><label>Artikel</label><input id="itemTitle" required maxlength="120"></div><div class="fieldgrid"><div class="field"><label>Kategorie</label><select id="itemCategory"><option>Geräte</option><option>Küchenutensilien</option><option>Verbrauchsmaterial</option><option>Reinigung</option><option>Lebensmittel</option><option>Getränke</option><option>Material</option><option>Sonstiges</option></select></div><div class="field"><label>Status</label><select id="itemStatus"><option>Besorgen</option><option>Zu prüfen</option><option>Weitergeleitet</option><option>Bestellt</option><option>Besorgt</option><option>Vorhanden</option></select></div><div class="field"><label>Menge</label><input id="itemAmount" inputmode="decimal"></div><div class="field"><label>Einheit</label><input id="itemUnit" maxlength="35"></div></div><div class="field"><label>Anmerkung</label><textarea id="itemNotes" maxlength="600"></textarea></div><div class="actions"><button class="btn primary" type="submit">Inventar speichern</button><button class="btn outline" type="button" id="inventoryClear">Neu</button></div></form><hr><div class="inventory-toolbar"><button id="inventoryPdf" class="btn primary" type="button">📄 PDF herunterladen</button><button id="inventoryPrint" class="btn secondary" type="button">🖨️ Druckansicht</button></div><p class="mini">PDF und Druckansicht übernehmen deine aktuelle Suche und Filterung. Druckfertig für A4.</p><div class="fieldgrid"><div class="field"><label for="itemSearch">Inventar durchsuchen</label><input id="itemSearch" type="search" placeholder="Artikel suchen …"></div><div class="field"><label for="itemFilter">Anzeigen</label><select id="itemFilter"><option value="">Alle Artikel</option><option value="Zu prüfen">Zu prüfen</option><option value="Besorgen">Besorgen</option><option value="Bestellt">Bestellt</option><option value="Vorhanden">Vorhanden</option></select></div></div><p id="inventorySummary" class="mini"></p><div id="inventoryList"></div></div>
  </div>
  <div id="adminStatus" aria-live="polite"></div>
 </section>
 </main>
 <footer>Mit 💚 für unsere Käsehütte · Weihnachten im Park 2026<br><small>Sogar der Grinch würde hier mithelfen · Änderungen im Dienstplan vorbehalten</small></footer>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <script>
 (function(){
 'use strict';
@@ -415,12 +425,29 @@ el('publishBtn').addEventListener('click',function(){publish(true)});
 el('unpublishBtn').addEventListener('click',function(){publish(false)});
 el('adminRefresh').addEventListener('click',loadAdmin);
 
-function renderInventory(){
+function inventoryVisible(){
  var all=adminData.inventory||[],term=(el('itemSearch').value||'').trim().toLocaleLowerCase('de'),filter=el('itemFilter').value;
- var shown=all.filter(function(i){return (!filter||i.status===filter)&&(!term||[i.item,i.category,i.note].join(' ').toLocaleLowerCase('de').includes(term))}).sort(function(a,b){var order={'Zu prüfen':0,'Besorgen':1,'Bestellt':2,'Vorhanden':3};return (order[a.status]??4)-(order[b.status]??4)||a.category.localeCompare(b.category,'de')||a.item.localeCompare(b.item,'de')});
+ var priority={'Zu prüfen':0,'Besorgen':1,'Weitergeleitet':2,'Bestellt':3,'Besorgt':4,'Vorhanden':5};
+ return all.filter(function(i){return (!filter||i.status===filter)&&(!term||[i.item,i.category,i.note].join(' ').toLocaleLowerCase('de').includes(term))}).sort(function(a,b){return (priority[a.status]??6)-(priority[b.status]??6)||a.category.localeCompare(b.category,'de')||a.item.localeCompare(b.item,'de')});
+}
+function inventoryQuickButtons(item){
+ if(['Vorhanden','Besorgt'].includes(item.status))return '';
+ var controls='';
+ if(['Zu prüfen','Besorgen','Bestellt'].includes(item.status))controls+='<button type="button" class="btn inventory-forward" data-quickstatus="Weitergeleitet" data-itemid="'+esc(item.id)+'">↗ Weitergeleitet</button>';
+ controls+='<button type="button" class="btn inventory-confirm" data-quickstatus="Besorgt" data-itemid="'+esc(item.id)+'">✓ Besorgt</button>';
+ if(item.status==='Zu prüfen')controls+='<button type="button" class="btn secondary" data-quickstatus="Vorhanden" data-itemid="'+esc(item.id)+'">✓ Vorhanden bestätigt</button>';
+ return '<div class="inventory-quick">'+controls+'</div>';
+}
+function renderInventory(){
+ var all=adminData.inventory||[],shown=inventoryVisible();
  var check=all.filter(function(i){return i.status==='Zu prüfen'}).length;
- el('inventorySummary').textContent=all.length+' Artikel · '+check+' zu prüfen · '+shown.length+' angezeigt';
- el('inventoryList').innerHTML=shown.length?shown.map(function(i){return '<div class="person"><strong>'+esc(i.item)+'</strong> · <span class="pill '+(i.status==='Zu prüfen'?'draft':'')+'">'+esc(i.status)+'</span><div class="mini">'+esc(i.quantity)+' '+esc(i.unit)+' · '+esc(i.category)+'</div>'+(i.note?'<p>'+esc(i.note)+'</p>':'')+'<div class="actions"><button class="btn outline small" data-edititem="'+esc(i.id)+'">Bearbeiten</button><button class="btn danger small" data-deleteitem="'+esc(i.id)+'">Löschen</button></div></div>'}).join(''):'<p class="mini">'+(all.length?'Keine passenden Artikel gefunden.':'Noch keine Inventareinträge.')+'</p>';
+ var forwarded=all.filter(function(i){return i.status==='Weitergeleitet'}).length;
+ var obtained=all.filter(function(i){return i.status==='Besorgt'}).length;
+ el('inventorySummary').textContent=all.length+' Artikel · '+check+' zu prüfen · '+forwarded+' weitergeleitet · '+obtained+' besorgt · '+shown.length+' angezeigt';
+ el('inventoryList').innerHTML=shown.length?shown.map(function(i){
+  var pending=['Zu prüfen','Besorgen','Weitergeleitet','Bestellt'].includes(i.status);
+  return '<div class="person"><strong>'+esc(i.item)+'</strong> · <span class="inventory-status-pill '+(pending?'pending':'success')+'">'+esc(i.status)+'</span><div class="mini">'+esc([i.quantity,i.unit].filter(Boolean).join(' ')||'Menge offen')+' · '+esc(i.category)+'</div>'+(i.note?'<p>'+esc(i.note)+'</p>':'')+inventoryQuickButtons(i)+'<div class="actions"><button class="btn outline small" data-edititem="'+esc(i.id)+'">Bearbeiten</button> <button class="btn danger small" data-deleteitem="'+esc(i.id)+'">Löschen</button></div></div>';
+ }).join(''):'<p class="mini">'+(all.length?'Keine passenden Artikel gefunden.':'Noch keine Inventareinträge.')+'</p>';
 }
 el('itemSearch').addEventListener('input',renderInventory);
 el('itemFilter').addEventListener('change',renderInventory);

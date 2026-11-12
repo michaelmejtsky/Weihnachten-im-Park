@@ -119,6 +119,11 @@ details[open]>.manual-summary:after{content:"⌃"}
 @media(max-width:720px){.plan-day-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.plan-grid{grid-template-columns:1fr 1fr}.plan-preview-row{grid-template-columns:1fr 1fr;gap:7px}.plan-preview-row .person-name{grid-column:1/-1}.plan-preview-row .proposal-role{grid-column:1/2}.plan-preview-row .proposal-remove{grid-column:2/3;justify-self:end}}
 @media(max-width:450px){.plan-grid{grid-template-columns:1fr}.coverage-row{grid-template-columns:91px minmax(65px,1fr) 81px;gap:5px;font-size:11px}.plan-area{padding:11px}}
 
+.admin-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px;margin:14px 0 16px}
+.admin-kpi{background:#f2f7f0;border:1px solid #e0e9dc;border-radius:13px;padding:12px}
+.admin-kpi strong{font-size:23px;line-height:1.1;color:#214d32;display:block}
+.admin-kpi span{font-size:12px;color:#607267;display:block;margin-top:5px}
+@media(max-width:540px){.admin-kpi{padding:10px}.admin-kpi strong{font-size:20px}.admin-kpi span{font-size:11px}}
 </style>
 <script src="config.js"></script>
 </head>
@@ -226,7 +231,7 @@ details[open]>.manual-summary:after{content:"⌃"}
  <div id="adminDashboard" hidden>
    <div class="card">
     <div class="spaced"><h3>Überblick</h3><button class="btn outline small" id="logoutButton" type="button">Abmelden</button></div>
-    <p id="adminCounts"></p>
+    <div id="adminCounts" class="admin-kpis"></div>
     <div class="actions"><button class="btn gold" id="publishBtn" type="button">✓ Plan veröffentlichen</button><button class="btn danger" id="unpublishBtn" type="button">Veröffentlichung zurücknehmen</button><button class="btn secondary" id="adminRefresh" type="button">↻ Neu laden</button></div>
     <p class="mini">Neue und bearbeitete Schichten sind zunächst Entwürfe. Erst nach dem Veröffentlichen erscheinen sie im öffentlichen Plan.</p>
    </div>
@@ -434,7 +439,7 @@ el('loginButton').addEventListener('click',function(){adminKey=el('adminKey').va
 el('logoutButton').addEventListener('click',function(){adminKey='';sessionStorage.removeItem('wip26_admin');el('adminLogin').hidden=false;el('adminDashboard').hidden=true;el('adminKey').value='';status('adminStatus','')});
 function renderAdmin(){
  var ppl=adminData.people,shifts=adminData.shifts;
- el('adminCounts').textContent=ppl.length+' Helfer-Anmeldungen · '+shifts.length+' Einteilungen · '+shifts.filter(function(s){return s.published}).length+' veröffentlicht';
+ el('adminCounts').innerHTML='<div class="admin-kpi"><strong>'+ppl.length+'</strong><span>Helfer angemeldet</span></div><div class="admin-kpi"><strong>'+shifts.length+'</strong><span>Dienste geplant</span></div><div class="admin-kpi"><strong>'+shifts.filter(function(s){return s.published}).length+'</strong><span>Fix veröffentlicht</span></div>';
  renderPlanner();
  el('shiftPerson').innerHTML='<option value="">Bitte wählen</option>'+ppl.map(function(p){return '<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>'}).join('');
  var filteredPeople=ppl.filter(function(p){return !el('adminPeopleFilter').value||(p.availability||[]).some(function(s){return s.date===el('adminPeopleFilter').value})});
@@ -443,7 +448,7 @@ function renderAdmin(){
   return '<div class="person"><div class="name">'+esc(p.name)+'</div><div class="sub">'+esc(p.phone||'Keine Nummer angegeben')+'</div>'+
   '<div class="chips">'+(p.availability||[]).map(function(s){return '<span class="chip">'+esc(dayName(s.date))+' · '+esc(s.from)+'–'+esc(s.to)+'</span>'}).join('')+'</div>'+
   (p.note?'<p class="mini"><strong>Wunsch:</strong> '+esc(p.note)+'</p>':'')+
-  '<button type="button" class="btn secondary small" data-person="'+esc(p.id)+'">Für Dienst auswählen</button></div>'
+  '<button type="button" class="btn secondary small" data-person="'+esc(p.id)+'">+ Direkt einteilen</button></div>'
  }).join('');
  el('notesList').innerHTML=(adminData.notes||[]).length?adminData.notes.map(function(n){return '<div class="person"><strong>'+esc(n.title)+'</strong> · '+esc(n.status)+'<p>'+esc(n.text)+'</p><button class="btn outline small" data-editnote="'+esc(n.id)+'">Bearbeiten</button> <button class="btn danger small" data-deletenote="'+esc(n.id)+'">Löschen</button></div>'}).join(''):'<p class="mini">Noch keine Notizen.</p>';
  renderInventory();
@@ -456,7 +461,23 @@ function renderAdmin(){
 }
 el('adminPeopleFilter').addEventListener('change',renderAdmin);
 el('adminShiftFilter').addEventListener('change',renderAdmin);
-el('adminPeople').addEventListener('click',function(e){var b=e.target.closest('[data-person]');if(!b)return;el('shiftPerson').value=b.dataset.person;el('manualEditor').open=true;el('shiftForm').scrollIntoView({behavior:'smooth'})});
+el('adminPeople').addEventListener('click',function(e){
+ var b=e.target.closest('[data-person]');if(!b)return;
+ var person=adminData.people.find(function(p){return p.id===b.dataset.person});if(!person)return;
+ resetShift();el('shiftPerson').value=person.id;
+ var pref=el('plannerDay').value;
+ var availability=(person.availability||[]).filter(function(a){return validSlot(a)}).sort(function(a,b){return a.date.localeCompare(b.date)||a.from.localeCompare(b.from)});
+ var match=availability.find(function(a){return a.date===pref})||availability[0];
+ if(match){
+  el('shiftDate').value=match.date;syncAdminTimeBounds();
+  el('shiftFrom').value=match.from;
+  var end=Math.min(planMinutes(match.to),planMinutes(match.from)+Math.min(Number(el('plannerMaxShift').value),240));
+  el('shiftTo').value=planClock(end);
+  el('shiftRole').value=match.date==='2026-12-07'?'Abbauarbeiten':'Käsehütte';
+ }
+ el('manualEditor').open=true;
+ el('shiftForm').scrollIntoView({behavior:'smooth'});
+});
 el('adminShifts').addEventListener('click',async function(e){
  var b=e.target.closest('button');if(!b)return;
  if(b.dataset.edit){var s=adminData.shifts.find(function(x){return x.id===b.dataset.edit});if(!s)return;
@@ -482,6 +503,14 @@ el('shiftForm').addEventListener('submit',async function(e){
 });
 async function publish(yes){
  var msg=yes?'Alle aktuellen Schichten für die Helfer FIX veröffentlichen?':'Alle veröffentlichten Einteilungen zurücknehmen?';
+ if(yes){
+  var under=DAYS.filter(function(d){return !d.teardown}).map(function(d){
+   var bounds=planBounds(d.id),gap=0;
+   if(bounds)for(var t=bounds.from;t<bounds.to;t+=30)if(planCountAt(adminData.shifts,d.id,t)<6)gap++;
+   return {day:dayName(d.id),gap:gap};
+  }).filter(function(x){return x.gap>0});
+  if(under.length)msg+='\n\n⚠ Mindestbesetzung von 6 Helfern ist noch nicht überall erreicht: '+under.map(function(x){return x.day+': '+x.gap+' halbstündige Zeitabschnitte'}).join(', ')+'. Trotzdem veröffentlichen?';
+ }
  if(!confirm(msg))return;
  try{var r=await call(yes?'publish':'unpublish',{adminKey:adminKey});await loadAdmin();status('adminStatus',r.message,'good')}
  catch(ex){status('adminStatus',ex.message,'bad')}
@@ -656,6 +685,7 @@ function planSuggestDays(dates){
 }
 function planSelectDay(date){
  el('plannerDay').value=date;el('adminShiftFilter').value=date;el('adminPeopleFilter').value=date;
+ if(!editShiftId){el('shiftDate').value=date;syncAdminTimeBounds()}
  renderAdmin();
 }
 el('planDayCards').addEventListener('click',function(e){var b=e.target.closest('[data-planday]');if(b)planSelectDay(b.dataset.planday)});

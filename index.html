@@ -285,7 +285,7 @@ details[open]>.manual-summary:after{content:"⌃"}
 'use strict';
 var API=String(window.WIP_API_URL||'').trim();
 var DAYS=[{id:'2026-12-04',name:'Freitag',short:'Fr, 04.12',start:'13:00',end:'23:00'},{id:'2026-12-05',name:'Samstag',short:'Sa, 05.12',start:'14:00',end:'23:00'},{id:'2026-12-06',name:'Sonntag',short:'So, 06.12',start:'13:00',end:'23:00'},{id:'2026-12-07',name:'Montag',short:'Mo, 07.12',start:'07:30',end:'23:59',teardown:true}];
-var slots=[], person=null, adminKey=sessionStorage.getItem('wip26_admin')||'', adminData={people:[],shifts:[],notes:[],inventory:[]}, editShiftId='',editNoteId='',editInventoryId='';
+var slots=[], person=null, adminKey=sessionStorage.getItem('wip26_admin')||'', adminData={people:[],shifts:[],notes:[],inventory:[],shiftRevision:null}, editShiftId='',editNoteId='',editInventoryId='', plannerPreview=[];
 function el(id){return document.getElementById(id)}
 function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function normalDate(value){
@@ -427,7 +427,7 @@ el('refreshPlan').addEventListener('click',loadPlan);
 async function loadAdmin(){
  if(!adminKey)return;
  status('adminStatus','Lade Helfer und Einteilungen …');
- try{var r=await call('adminList',{adminKey:adminKey});adminData={people:r.people||[],shifts:(r.shifts||[]).map(normalShift),notes:r.notes||[],inventory:r.inventory||[]};el('adminLogin').hidden=true;el('adminDashboard').hidden=false;status('adminStatus','');renderAdmin()}
+ try{var r=await call('adminList',{adminKey:adminKey});adminData={people:r.people||[],shifts:(r.shifts||[]).map(normalShift),notes:r.notes||[],inventory:r.inventory||[],shiftRevision:typeof r.shiftRevision==='string'?r.shiftRevision:null};plannerPreview=[];el('adminLogin').hidden=true;el('adminDashboard').hidden=false;status('adminStatus','');renderAdmin()}
  catch(ex){status('adminStatus',ex.message,'bad');if(/Admin-Schlüssel falsch/.test(ex.message)){adminKey='';sessionStorage.removeItem('wip26_admin');el('adminLogin').hidden=false;el('adminDashboard').hidden=true}}
 }
 el('loginButton').addEventListener('click',function(){adminKey=el('adminKey').value.trim();if(!adminKey){status('adminStatus','Admin-Schlüssel eingeben.','bad');return}sessionStorage.setItem('wip26_admin',adminKey);loadAdmin()});
@@ -435,9 +435,11 @@ el('logoutButton').addEventListener('click',function(){adminKey='';sessionStorag
 function renderAdmin(){
  var ppl=adminData.people,shifts=adminData.shifts;
  el('adminCounts').textContent=ppl.length+' Helfer-Anmeldungen · '+shifts.length+' Einteilungen · '+shifts.filter(function(s){return s.published}).length+' veröffentlicht';
+ renderPlanner();
  el('shiftPerson').innerHTML='<option value="">Bitte wählen</option>'+ppl.map(function(p){return '<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>'}).join('');
- if(ppl.length===0)el('adminPeople').innerHTML='<div class="empty">Noch keine Anmeldungen.</div>';
- else el('adminPeople').innerHTML=ppl.slice().sort(function(a,b){return a.name.localeCompare(b.name,'de')}).map(function(p){
+ var filteredPeople=ppl.filter(function(p){return !el('adminPeopleFilter').value||(p.availability||[]).some(function(s){return s.date===el('adminPeopleFilter').value})});
+ if(filteredPeople.length===0)el('adminPeople').innerHTML='<div class="empty">Keine Helfer mit Verfügbarkeit für diesen Tag.</div>';
+ else el('adminPeople').innerHTML=filteredPeople.slice().sort(function(a,b){return a.name.localeCompare(b.name,'de')}).map(function(p){
   return '<div class="person"><div class="name">'+esc(p.name)+'</div><div class="sub">'+esc(p.phone||'Keine Nummer angegeben')+'</div>'+
   '<div class="chips">'+(p.availability||[]).map(function(s){return '<span class="chip">'+esc(dayName(s.date))+' · '+esc(s.from)+'–'+esc(s.to)+'</span>'}).join('')+'</div>'+
   (p.note?'<p class="mini"><strong>Wunsch:</strong> '+esc(p.note)+'</p>':'')+
@@ -445,17 +447,20 @@ function renderAdmin(){
  }).join('');
  el('notesList').innerHTML=(adminData.notes||[]).length?adminData.notes.map(function(n){return '<div class="person"><strong>'+esc(n.title)+'</strong> · '+esc(n.status)+'<p>'+esc(n.text)+'</p><button class="btn outline small" data-editnote="'+esc(n.id)+'">Bearbeiten</button> <button class="btn danger small" data-deletenote="'+esc(n.id)+'">Löschen</button></div>'}).join(''):'<p class="mini">Noch keine Notizen.</p>';
  renderInventory();
- if(!shifts.length)el('adminShifts').innerHTML='<div class="empty">Noch keine Einteilungen angelegt.</div>';
- else el('adminShifts').innerHTML=shifts.slice().sort(function(a,b){return (a.date+a.from).localeCompare(b.date+b.from)}).map(function(s){
+ var viewShifts=shifts.filter(function(s){return !el('adminShiftFilter').value||s.date===el('adminShiftFilter').value});
+ if(!viewShifts.length)el('adminShifts').innerHTML='<div class="empty">Noch keine Einteilungen für diese Auswahl.</div>';
+ else el('adminShifts').innerHTML=viewShifts.slice().sort(function(a,b){return (a.date+a.from).localeCompare(b.date+b.from)}).map(function(s){
   var p=ppl.find(function(x){return x.id===s.personId});
   return '<div class="adminshift"><div><strong>'+esc(p?p.name:'Unbekannt')+'</strong> · '+esc(dayName(s.date))+' · '+esc(s.from)+'–'+esc(s.to)+(validSlot(s)?'':' <span class="pill draft">⚠ Außerhalb Helferzeiten</span>')+'<div class="mini">'+esc(s.role)+(s.note?' · '+esc(s.note):'')+'</div></div><div class="actions"><span class="pill '+(s.published?'':'draft')+'">'+(s.published?'Fix':'Entwurf')+'</span><button class="btn outline small" type="button" data-edit="'+esc(s.id)+'">Ändern</button><button class="btn danger small" type="button" data-delete="'+esc(s.id)+'">Löschen</button></div></div>'
  }).join('');
 }
-el('adminPeople').addEventListener('click',function(e){var b=e.target.closest('[data-person]');if(!b)return;el('shiftPerson').value=b.dataset.person;el('shiftForm').scrollIntoView({behavior:'smooth'})});
+el('adminPeopleFilter').addEventListener('change',renderAdmin);
+el('adminShiftFilter').addEventListener('change',renderAdmin);
+el('adminPeople').addEventListener('click',function(e){var b=e.target.closest('[data-person]');if(!b)return;el('shiftPerson').value=b.dataset.person;el('manualEditor').open=true;el('shiftForm').scrollIntoView({behavior:'smooth'})});
 el('adminShifts').addEventListener('click',async function(e){
  var b=e.target.closest('button');if(!b)return;
  if(b.dataset.edit){var s=adminData.shifts.find(function(x){return x.id===b.dataset.edit});if(!s)return;
-  editShiftId=s.id;el('shiftPerson').value=s.personId;el('shiftDate').value=s.date;syncAdminTimeBounds();el('shiftFrom').value=s.from;el('shiftTo').value=s.to;el('shiftRole').value=s.role;el('shiftNote').value=s.note;el('shiftSave').textContent='Änderung speichern';el('shiftForm').scrollIntoView({behavior:'smooth'});return}
+  editShiftId=s.id;el('shiftPerson').value=s.personId;el('shiftDate').value=s.date;syncAdminTimeBounds();el('shiftFrom').value=s.from;el('shiftTo').value=s.to;el('shiftRole').value=s.role;el('shiftNote').value=s.note;el('shiftSave').textContent='Änderung speichern';el('manualEditor').open=true;el('shiftForm').scrollIntoView({behavior:'smooth'});return}
  if(b.dataset.delete){if(!confirm('Diese Einteilung wirklich löschen?'))return;try{await call('deleteShift',{adminKey:adminKey,shiftId:b.dataset.delete});await loadAdmin()}catch(ex){status('adminStatus',ex.message,'bad')}}
 });
 function syncAdminTimeBounds(){var d=DAYS.find(function(x){return x.id===el('shiftDate').value})||DAYS[0];['shiftFrom','shiftTo'].forEach(function(id){el(id).min=d.start;el(id).max=d.end});}

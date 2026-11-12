@@ -795,6 +795,128 @@ function planParticipation(date){
  var used=new Set(current.map(function(s){return s.personId}));
  return {eligible:eligible,assigned:eligible.filter(function(p){return used.has(p.id)}),reserve:eligible.filter(function(p){return !used.has(p.id)})};
 }
+
+/* WIP_VISUAL_PLAN_BEGIN – Darstellung nur in der geschützten Adminansicht */
+function visualState(date){
+ var day=DAYS.find(function(d){return d.id===date}),saved=(adminData.shifts||[]).filter(function(s){return s.date===date}),preview=plannerPreview.filter(function(s){return s.date===date});
+ var input=saved.map(function(s){return Object.assign({},s,{source:'Gespeichert',proposed:false})})
+   .concat(preview.map(function(s){return Object.assign({},s,{source:'Vorschlag',proposed:true,published:false})}));
+ var valid=input.filter(function(s){return Number.isFinite(planMinutes(s.from))&&Number.isFinite(planMinutes(s.to))&&planMinutes(s.from)<planMinutes(s.to)});
+ var bounds=planBoundsForDay(date);
+ var derivedEnd=false;
+ if(!bounds&&day&&day.teardown&&valid.length){
+  var maxEnd=Math.max.apply(null,valid.map(function(s){return planMinutes(s.to)}));
+  bounds={date:date,from:planMinutes(day.start),to:maxEnd};
+  derivedEnd=true;
+ }
+ if(!bounds||bounds.to<=bounds.from)return {date:date,day:day,missingEnd:!!day&&!!day.teardown,shifts:valid,rows:[],events:[],parts:[],eligible:[],reserve:[]};
+ var from=bounds.from,to=bounds.to;
+ var shifts=valid.filter(function(s){return planMinutes(s.to)>from&&planMinutes(s.from)<to});
+ var peopleById={};(adminData.people||[]).forEach(function(p){peopleById[p.id]=p});
+ var persons=new Map();
+ shifts.forEach(function(s){
+  var p=peopleById[s.personId],entry=persons.get(s.personId);
+  if(!entry){entry={id:s.personId,name:p?p.name:'Unbekannter Helfer',segments:[]};persons.set(s.personId,entry)}
+  entry.segments.push(s);
+ });
+ var rows=Array.from(persons.values()).sort(function(a,b){
+  var am=Math.min.apply(null,a.segments.map(function(s){return planMinutes(s.from)}));
+  var bm=Math.min.apply(null,b.segments.map(function(s){return planMinutes(s.from)}));
+  return am-bm||a.name.localeCompare(b.name,'de');
+ });
+ var eligible=(adminData.people||[]).filter(function(p){return planMergedWindows(p,date,bounds).length>0});
+ var moments=new Set([from,to]);
+ for(var t=Math.ceil(from/30)*30;t<to;t+=30)moments.add(t);
+ shifts.forEach(function(s){moments.add(Math.max(from,Math.min(to,planMinutes(s.from))));moments.add(Math.max(from,Math.min(to,planMinutes(s.to))))});
+ var timeline=Array.from(moments).sort(function(a,b){return a-b}),parts=[];
+ for(var i=0;i<timeline.length-1;i++){
+  var begin=timeline[i],end=timeline[i+1];
+  if(end>begin)parts.push({from:begin,to:end,count:planCountAt(shifts,date,begin)});
+ }
+ var eventsMap=new Map();
+ shifts.forEach(function(s){
+  var p=peopleById[s.personId],name=p?p.name:'Unbekannter Helfer';
+  [{time:planMinutes(s.from),type:'arrivals'},{time:planMinutes(s.to),type:'departures'}].forEach(function(event){
+   if(event.time<from||event.time>to)return;
+   var entry=eventsMap.get(event.time)||{time:event.time,arrivals:[],departures:[]};
+   entry[event.type].push({name:name,proposed:s.proposed});
+   eventsMap.set(event.time,entry);
+  });
+ });
+ var events=Array.from(eventsMap.values()).sort(function(a,b){return a.time-b.time});
+ events.forEach(function(ev){ev.after=planCountAt(shifts,date,ev.time)});
+ var used=new Set(shifts.map(function(s){return s.personId}));
+ return {date:date,day:day,bounds:bounds,derivedEnd:derivedEnd,missingEnd:false,shifts:shifts,
+  rows:rows,events:events,parts:parts,eligible:eligible,reserve:eligible.filter(function(p){return !used.has(p.id)})};
+}
+function visualHeadClass(count){return count<4?'low':count<6?'mid':count===6?'good':'over'}
+function visualPct(time,bounds){return Math.max(0,Math.min(100,100*(time-bounds.from)/(bounds.to-bounds.from)))}
+function visualTimeAxis(model){
+ var bounds=model.bounds,steps=[],from=bounds.from,to=bounds.to;
+ steps.push(from);
+ for(var t=Math.ceil(from/60)*60;t<to;t+=60)if(t!==from)steps.push(t);
+ if(steps[steps.length-1]!==to)steps.push(to);
+ return '<div class="viz-line"><div class="viz-label">Uhrzeit</div><div class="viz-track viz-axis">'+steps.map(function(t,i){
+  return '<span class="'+(i===0?'first':i===steps.length-1?'last':'')+'" style="left:'+visualPct(t,bounds).toFixed(3)+'%">'+esc(planClock(t))+'</span>';
+ }).join('')+'</div></div>';
+}
+function visualGrid(model){
+ if(!model.bounds)return '';
+ var b=model.bounds,out='';
+ for(var t=Math.ceil(b.from/60)*60;t<b.to;t+=60)if(t>b.from)out+='<i style="left:'+visualPct(t,b).toFixed(3)+'%"></i>';
+ return '<div class="viz-grid">'+out+'</div>';
+}
+function visualMapHtml(model){
+ if(model.missingEnd)return '<div class="viz-alert">Abbau am Montag: Wähle oben zuerst ein Planungsende. Die tatsächliche Endzeit bleibt offen.</div>';
+ if(!model.bounds)return '<div class="viz-empty">Für diesen Tag ist noch kein Zeitraum verfügbar.</div>';
+ var b=model.bounds,grid=visualGrid(model),events=model.events||[];
+ var head=model.parts.map(function(p){
+  var color=visualHeadClass(p.count),label=planClock(p.from)+'–'+planClock(p.to)+': '+p.count+' Helfer';
+  return '<span class="'+color+'" style="flex:'+Math.max(1,p.to-p.from)+' 1 0" title="'+esc(label)+'">'+((p.to-p.from)>=30?p.count:'')+'</span>';
+ }).join('');
+ var rows=model.rows.map(function(person){
+  var total=person.segments.reduce(function(sum,s){return sum+(planMinutes(s.to)-planMinutes(s.from))},0),label=person.name;
+  var bars=person.segments.map(function(s){
+   var start=Math.max(b.from,planMinutes(s.from)),end=Math.min(b.to,planMinutes(s.to));
+   if(end<=start)return '';
+   var validPerson=(adminData.people||[]).find(function(p){return p.id===s.personId});
+   var invalid=!!validPerson&&!planFitsAvailability(validPerson,s);
+   var cls='viz-bar'+(s.proposed?' draft':'')+(invalid?' bad':'');
+   var title=label+' · '+s.from+'–'+s.to+' Uhr · '+s.role+' · '+(s.proposed?'Vorschlag':s.published?'Fix veröffentlicht':'Gespeicherter Entwurf');
+   return '<div class="'+cls+'" title="'+esc(title)+'" style="left:'+visualPct(start,b).toFixed(3)+'%;width:'+Math.max(0,visualPct(end,b)-visualPct(start,b)).toFixed(3)+'%"><small>'+esc(s.from)+'–'+esc(s.to)+'</small></div>';
+  }).join('');
+  return '<div class="viz-line viz-helper-row"><div class="viz-label viz-person-name">'+esc(label)+'<small>'+Math.round(total/6)/10+' Std. · '+person.segments.length+' Dienst'+(person.segments.length>1?'e':'')+'</small></div><div class="viz-track">'+grid+bars+'</div></div>';
+ }).join('');
+ var maxCount=model.parts.length?Math.max.apply(null,model.parts.map(function(s){return s.count})):0;
+ var gaps=model.parts.filter(function(s){return s.count<6}).reduce(function(sum,s){return sum+s.to-s.from},0);
+ var over=model.parts.filter(function(s){return s.count>6}).reduce(function(sum,s){return sum+s.to-s.from},0);
+ var metrics='<div class="viz-metrics"><span>'+model.rows.length+' / '+model.eligible.length+' Helfer eingeplant</span><span>'+Math.round(gaps)+' Min. unter 6</span><span>'+Math.round(over)+' Min. über 6</span><span>Max. gleichzeitig: '+maxCount+'</span><span>'+events.length+' Wechselzeiten</span></div>';
+ var reserve=model.reserve.length?'<div class="viz-alert"><strong>Noch nicht eingeplant / Reserve:</strong> '+esc(model.reserve.map(function(p){return p.name}).join(', '))+'</div>':'';
+ return metrics+(model.derivedEnd?'<div class="viz-alert">Montag: Anzeige endet beim letzten eingetragenen Dienst. Das ist <strong>kein festgelegtes Abbauende</strong>.</div>':'')+
+ '<div class="viz-scroller"><div class="viz-inner">'+visualTimeAxis(model)+
+ '<div class="viz-line"><div class="viz-label">Gleichzeitig da<small>Soll: 6 Helfer</small></div><div class="viz-cover-strip">'+head+'</div></div>'+
+ (rows||'<div class="viz-empty">Noch keine Helfer eingeteilt. Neue Vorschläge werden hier sofort angezeigt.</div>')+'</div></div>'+reserve;
+}
+function visualEventsHtml(model){
+ if(model.missingEnd||!model.bounds)return '';
+ if(!model.events.length)return '<div class="viz-empty">Noch keine Dienstwechsel vorhanden.</div>';
+ return '<h4 style="margin:18px 0 7px;font-size:15px;color:#234932">↗ Wer kommt, wer geht?</h4>'+
+ model.events.map(function(ev){
+  var inNames=ev.arrivals.map(function(p){return esc(p.name)+(p.proposed?' <small>(Vorschlag)</small>':'')}).join(', ');
+  var outNames=ev.departures.map(function(p){return esc(p.name)+(p.proposed?' <small>(Vorschlag)</small>':'')}).join(', ');
+  return '<div class="viz-handover"><time>'+esc(planClock(ev.time))+'</time><div>'+
+   (inNames?'<div class="arrival"><strong>↑ Kommt ('+ev.arrivals.length+'):</strong> '+inNames+'</div>':'')+
+   (outNames?'<div class="departure"><strong>↓ Geht ('+ev.departures.length+'):</strong> '+outNames+'</div>':'')+
+   '<span class="headcount">Danach anwesend: <strong>'+ev.after+' / 6</strong>'+(ev.arrivals.length&&ev.departures.length?' · Übergabe / Überschneidung':'')+'</span></div></div>';
+ }).join('');
+}
+function renderVisualPlan(){
+ var date=el('plannerDay').value,model=visualState(date);
+ el('visualPlanMap').innerHTML=visualMapHtml(model);
+ el('visualPlanEvents').innerHTML=visualEventsHtml(model);
+}
+/* WIP_VISUAL_PLAN_END */
+
 function renderPlanner(){
  var selected=el('plannerDay').value,day=DAYS.find(function(d){return d.id===selected})||DAYS[0];
  el('plannerMonday').hidden=!day.teardown;
@@ -833,6 +955,7 @@ function renderPlanner(){
  el('plannerDiscard').disabled=plannerPreview.length===0;
  if(plannerPreview.length&&typeof adminData.shiftRevision!=='string')
   el('plannerPreview').innerHTML+='<div class="plan-result warning">⚠ Der Apps-Script-Code muss auf die aktuelle Version aktualisiert werden, damit Vorschläge gesammelt gespeichert werden können.</div>';
+ renderVisualPlan();
 }
 function planSuggestDays(dates){
  var maxShift=Number(el('plannerMaxShift').value),dailyMax=Number(el('plannerDailyMax').value);

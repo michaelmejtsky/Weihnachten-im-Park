@@ -124,6 +124,7 @@ details[open]>.manual-summary:after{content:"⌃"}
 .admin-kpi strong{font-size:23px;line-height:1.1;color:#214d32;display:block}
 .admin-kpi span{font-size:12px;color:#607267;display:block;margin-top:5px}
 @media(max-width:540px){.admin-kpi{padding:10px}.admin-kpi strong{font-size:20px}.admin-kpi span{font-size:11px}}
+.plan-availability{display:block;font-size:11px;font-weight:750;color:#287044;margin-top:6px;line-height:1.4}.plan-preview-row.invalid{border:1px solid #e9bf91;border-radius:10px;padding:10px;background:#fff7ee}.plan-availability.invalid{color:#a44b25}.plan-verified{font-size:11px;font-weight:800;color:#246e3f;background:#e7f5e9;border-radius:8px;padding:5px 9px;margin:5px 0 11px;display:inline-block}
 </style>
 <script src="config.js"></script>
 </head>
@@ -242,11 +243,11 @@ details[open]>.manual-summary:after{content:"⌃"}
     <div id="planDayCards" class="plan-day-cards"></div>
     <div class="plan-grid">
       <div class="field"><label for="plannerDay">Planungstag</label><select id="plannerDay"><option value="2026-12-04">Fr, 04.12.</option><option value="2026-12-05">Sa, 05.12.</option><option value="2026-12-06">So, 06.12.</option><option value="2026-12-07">Mo, 07.12. (Abbau)</option></select></div>
-      <div class="field"><label for="plannerMaxShift">Max. Länge je Teildienst</label><select id="plannerMaxShift"><option value="120">2 Stunden</option><option value="180">3 Stunden</option><option value="240" selected>4 Stunden</option><option value="360">6 Stunden</option></select></div>
-      <div class="field"><label for="plannerDailyMax">Max. je Person und Tag</label><select id="plannerDailyMax"><option value="240">4 Stunden</option><option value="360">6 Stunden</option><option value="480" selected>8 Stunden</option><option value="600">10 Stunden</option><option value="720">12 Stunden</option></select></div>
+      <div class="field"><label for="plannerMaxShift">Max. Länge je Teildienst</label><select id="plannerMaxShift"><option value="240">4 Stunden</option><option value="360">6 Stunden</option><option value="480">8 Stunden</option><option value="600">10 Stunden</option><option value="720" selected>12 Stunden</option></select></div>
+      <div class="field"><label for="plannerDailyMax">Max. je Person und Tag</label><select id="plannerDailyMax"><option value="480">8 Stunden</option><option value="600">10 Stunden</option><option value="720" selected>12 Stunden</option></select></div>
     </div>
     <div id="plannerMonday" class="field" hidden><label for="plannerMondayEnd">Montag: Bis wann soll der Abbau eingeplant werden?</label><input type="time" id="plannerMondayEnd" min="08:00" max="23:30" step="1800"><p class="hint">Nur ein Planungsende, keine offiziell festgelegte Endzeit. Abbau beginnt um 07:30 Uhr.</p></div>
-    <p class="plan-hint">Ziel: 6 Helfer gleichzeitig, geprüft in 30-Minuten-Abschnitten. Die Obergrenzen vermeiden überlange Vorschläge. Sind zu wenige passende Helfer verfügbar, bleiben sichtbare Lücken.</p>
+    <p class="plan-hint">Ziel: 6 Helfer gleichzeitig. Die Automatik bevorzugt einen einzigen langen, zusammenhängenden Dienst je Person statt unnötiger Teilungen. Angegebene Verfügbarkeiten sind verbindliche Grenzen. Fehlende Helfer werden als Lücke angezeigt.</p>
     <div class="actions">
       <button class="btn primary" type="button" id="plannerGenerate">✨ Tag automatisch vorschlagen</button>
       <button class="btn secondary" type="button" id="plannerAllDays">🎄 Fr–So auf einmal</button>
@@ -535,38 +536,73 @@ function planCountAt(shifts,date,minute){
 function planAvailableAt(p,date,minute){
  return (p.availability||[]).some(function(a){return a.date===date&&planMinutes(a.from)<=minute&&planMinutes(a.to)>minute});
 }
+function planMergedWindows(person,date,bounds){
+ var windows=(person.availability||[]).filter(function(a){
+  return a.date===date&&Number.isFinite(planMinutes(a.from))&&Number.isFinite(planMinutes(a.to))&&planMinutes(a.from)<planMinutes(a.to);
+ }).map(function(a){return {from:Math.max(bounds.from,planMinutes(a.from)),to:Math.min(bounds.to,planMinutes(a.to))}})
+ .filter(function(a){return a.to>a.from}).sort(function(a,b){return a.from-b.from||a.to-b.to});
+ var merged=[];
+ windows.forEach(function(w){var last=merged[merged.length-1];if(last&&w.from<=last.to)last.to=Math.max(last.to,w.to);else merged.push({from:w.from,to:w.to})});
+ return merged;
+}
 function planBuildDay(date,bounds,people,existing,options){
  if(!bounds)throw Error('Bitte für Montag zuerst ein Planungsende auswählen.');
  var all=existing.slice(),suggested=[],target=6;
- for(var t=bounds.from;t<bounds.to;t+=30){
-  var safety=0;
-  while(planCountAt(all,date,t)<target&&safety++<people.length+2){
-   var choices=[];
-   people.forEach(function(person){
-    var own=all.filter(function(s){return s.personId===person.id&&s.date===date});
-    if(own.some(function(s){return planMinutes(s.from)<=t&&t<planMinutes(s.to)}))return;
-    var avail=(person.availability||[]).filter(function(a){return a.date===date&&planMinutes(a.from)<=t&&planMinutes(a.to)>t});
-    if(!avail.length)return;
-    var endAvailable=Math.max.apply(null,avail.map(function(a){return planMinutes(a.to)}));
-    var used=own.reduce(function(sum,s){return sum+Math.max(0,planMinutes(s.to)-planMinutes(s.from))},0);
-    var remaining=options.dailyMax-used;
-    if(remaining<30)return;
-    var nextOwn=Math.min.apply(null,[bounds.to].concat(own.filter(function(s){return planMinutes(s.from)>t}).map(function(s){return planMinutes(s.from)})));
-    var end=Math.min(bounds.to,endAvailable,nextOwn,t+options.maxShift,t+remaining);
-    end=t+Math.floor((end-t)/30)*30;
-    if(end<=t)return;
-    var benefit=0;
-    for(var k=t;k<end;k+=30)if(planCountAt(all,date,k)<target)benefit++;
-    var total=all.filter(function(s){return s.personId===person.id}).reduce(function(sum,s){return sum+Math.max(0,planMinutes(s.to)-planMinutes(s.from))},0);
-    var score=benefit*20+(end-t)/30*5-used/30*2-total/30*.25;
-    choices.push({personId:person.id,from:t,to:end,score:score,name:person.name});
+ var maxShift=Math.max(30,Number(options.maxShift)||720),dailyMax=Math.max(30,Number(options.dailyMax)||720);
+ // Ausgangspunkt ist die gesamte Verfügbarkeit, nicht eine künstliche 4-Stunden-Schicht.
+ // Zunächst höchstens EIN neuer, zusammenhängender Dienst je Person.
+ // Nur wenn das nicht reicht, darf eine bereits eingeteilte Person ergänzend helfen.
+ function bestCandidate(allowSecondShift){
+  var best=null;
+  people.forEach(function(person){
+   var own=all.filter(function(s){return s.date===date&&s.personId===person.id});
+   if(own.length&&!allowSecondShift)return;
+   var used=own.reduce(function(sum,s){var len=planMinutes(s.to)-planMinutes(s.from);return sum+(Number.isFinite(len)?Math.max(0,len):0)},0);
+   var maxLen=Math.min(maxShift,dailyMax-used);
+   if(maxLen<30)return;
+   var windows=planMergedWindows(person,date,bounds);
+   windows.forEach(function(w){
+    // Bei einem 15-Minuten-Beginn auf die nächste halbe Stunde gehen.
+    var first=Math.ceil(w.from/30)*30,last=Math.floor(w.to/30)*30;
+    for(var start=first;start+30<=last;start+=30){
+     var cutoff=Math.min(last,start+maxLen);
+     var next=own.filter(function(s){return planMinutes(s.from)>=start}).map(function(s){return planMinutes(s.from)});
+     if(next.length)cutoff=Math.min(cutoff,Math.min.apply(null,next));
+     if(own.some(function(s){return planMinutes(s.from)<cutoff&&planMinutes(s.to)>start}))continue;
+     var end=start+Math.floor((cutoff-start)/30)*30;
+     if(end<=start)continue;
+     // Ein Kandidat erhält nur Punkte für Zeitabschnitte mit Personalbedarf.
+     var value=0;
+     for(var t=start;t<end;t+=30)if(planCountAt(all,date,t)<target)value++;
+     if(!value)continue;
+     // Höhere gesamte Abdeckung und lange, durchgehende Dienste bevorzugen.
+     // Ein zusätzlicher zweiter Dienst wird nur im zweiten Suchdurchgang berücksichtigt.
+     var score=value*100+(end-start)/30*0.2-(own.length?50:0);
+     if(!best||score>best.score||score===best.score&&end-start>best.to-best.from||
+       score===best.score&&end-start===best.to-best.from&&person.name.localeCompare(best.name,'de')<0){
+       best={personId:person.id,name:person.name,from:start,to:end,score:score};
+     }
+    }
    });
-   choices.sort(function(a,b){return b.score-a.score||a.name.localeCompare(b.name,'de')});
-   if(!choices.length)break;
-   var best=choices[0];
-   var added={personId:best.personId,date:date,from:planClock(best.from),to:planClock(best.to),role:date==='2026-12-07'?'Abbauarbeiten':'Käsehütte',note:'Automatischer Vorschlag – bitte prüfen'};
-   all.push(added);suggested.push(added);
-  }
+  });
+  return best;
+ }
+ var limit=Math.max(1,people.length*3),tries=0;
+ while(tries++<limit){
+  var best=bestCandidate(false);
+  if(!best)best=bestCandidate(true);
+  if(!best)break;
+  var added={personId:best.personId,date:date,from:planClock(best.from),to:planClock(best.to),
+    role:date==='2026-12-07'?'Abbauarbeiten':'Käsehütte',
+    note:'Automatischer Vorschlag – Verfügbarkeit geprüft'};
+  var p=people.find(function(x){return x.id===best.personId});
+  if(!p||!planMergedWindows(p,date,bounds).some(function(w){return best.from>=w.from&&best.to<=w.to}))
+   throw Error('Automatische Planung abgebrochen: Vorschlag liegt außerhalb einer gemeldeten Verfügbarkeit.');
+  if(all.some(function(s){return s.personId===added.personId&&s.date===date&&added.from<s.to&&added.to>s.from}))
+   throw Error('Automatische Planung abgebrochen: Zeitüberschneidung erkannt.');
+  all.push(added);suggested.push(added);
+  if(!Array.from({length:Math.ceil((bounds.to-bounds.from)/30)},(_,i)=>bounds.from+i*30)
+    .some(function(t){return planCountAt(all,date,t)<target}))break;
  }
  return suggested;
 }
@@ -586,6 +622,34 @@ function planCoverage(date){
  }
  return {bounds:bounds,parts:parts,complete:parts.filter(function(v){return v.count>=6}).length};
 }
+
+function planAvailabilityWindows(person,date){
+ return (person&&Array.isArray(person.availability)?person.availability:[]).filter(function(a){
+  return a.date===date&&Number.isFinite(planMinutes(a.from))&&Number.isFinite(planMinutes(a.to))&&planMinutes(a.from)<planMinutes(a.to);
+ }).sort(function(a,b){return a.from.localeCompare(b.from)||a.to.localeCompare(b.to)});
+}
+function planAvailabilityLabel(person,date){
+ var slots=planAvailabilityWindows(person,date);
+ return slots.length?slots.map(function(a){return a.from+'–'+a.to+' Uhr'}).join(' · '):'Keine Verfügbarkeit für diesen Tag';
+}
+function planFitsAvailability(person,shift){
+ var from=planMinutes(shift.from),to=planMinutes(shift.to);
+ return planAvailabilityWindows(person,shift.date).some(function(a){return planMinutes(a.from)<=from&&planMinutes(a.to)>=to});
+}
+function planAlignToAvailability(person,shift){
+ var slots=planAvailabilityWindows(person,shift.date);if(!slots.length)return null;
+ var oldFrom=planMinutes(shift.from),oldTo=planMinutes(shift.to);
+ var length=Number.isFinite(oldTo-oldFrom)&&oldTo>oldFrom?oldTo-oldFrom:120;
+ var choices=slots.map(function(a){
+  var low=planMinutes(a.from),high=planMinutes(a.to);
+  var from=Math.max(low,Math.min(oldFrom,high-30));
+  var to=Math.min(high,from+length);
+  if(to<=from)return null;
+  return {from:from,to:to,score:Math.abs(oldFrom-from)};
+ }).filter(Boolean).sort(function(a,b){return a.score-b.score});
+ return choices.length?{from:planClock(choices[0].from),to:planClock(choices[0].to)}:null;
+}
+
 function planPreviewErrors(){
  var errors={},existing=adminData.shifts.slice(),known={};
  (adminData.people||[]).forEach(function(p){known[p.id]=p});
@@ -593,7 +657,7 @@ function planPreviewErrors(){
   var p=known[s.personId],reason='';
   if(!p)reason='Person nicht gefunden';
   else if(!validSlot(s))reason='Zeit liegt außerhalb der Veranstaltungszeiten';
-  else if(!(p.availability||[]).some(function(a){return a.date===s.date&&a.from<=s.from&&a.to>=s.to}))reason='Person hat diese Zeit nicht als verfügbar gemeldet';
+  else if(!planFitsAvailability(p,s))reason='Nicht zulässig! Gemeldet: '+planAvailabilityLabel(p,s.date)+'; vorgeschlagen: '+s.from+'–'+s.to+' Uhr.';
   else if(existing.some(function(old){return old.personId===s.personId&&old.date===s.date&&s.from<old.to&&s.to>old.from}))reason='Zeitüberschneidung mit bestehendem oder anderem Vorschlagsdienst';
   if(reason)errors[i]=reason;
   existing.push(s);
@@ -648,12 +712,14 @@ function renderPlanner(){
  (plannerPreview.length?'<p class="plan-hint">Du kannst Helfer und Zeiten direkt ändern oder Zeilen entfernen. Gespeichert werden erst alle Vorschläge gemeinsam nach deiner Bestätigung.</p>':'<p class="plan-hint">Noch kein Vorschlag berechnet. Klicke auf „Tag automatisch vorschlagen“. Vorhandene Dienste werden berücksichtigt.</p>')+
  (rows.length?rows.map(function(v){
   var s=v.entry,idx=v.index;
+  var selectedPerson=adminData.people.find(function(p){return p.id===s.personId});
+  var listedTime=planAvailabilityLabel(selectedPerson,s.date);
   var options=(adminData.people||[]).slice().sort(function(a,b){return a.name.localeCompare(b.name,'de')}).map(function(p){return '<option value="'+esc(p.id)+'" '+(p.id===s.personId?'selected':'')+'>'+esc(p.name)+'</option>'}).join('');
-  return '<div class="plan-preview-row" data-preview-index="'+idx+'"><div><label class="person-name">Helfer:in</label><select aria-label="Helfer ändern" data-propfield="personId">'+options+'</select></div>'+
+  return '<div class="plan-preview-row'+(errors[idx]?' invalid':'')+'" data-preview-index="'+idx+'"><div><label class="person-name">Helfer:in</label><select aria-label="Helfer ändern" data-propfield="personId">'+options+'</select><span class="plan-availability'+(errors[idx]?' invalid':'')+'">Gemeldet: '+esc(listedTime)+'</span></div>'+
    '<div><label>Von</label><input type="time" data-propfield="from" value="'+esc(s.from)+'"></div><div><label>Bis</label><input type="time" data-propfield="to" value="'+esc(s.to)+'"></div>'+
    '<div class="proposal-role"><label>Bereich</label><select data-propfield="role"><option '+(s.role==='Käsehütte'?'selected':'')+'>Käsehütte</option><option '+(s.role==='Abbauarbeiten'?'selected':'')+'>Abbauarbeiten</option><option '+(s.role==='Verkauf'?'selected':'')+'>Verkauf</option><option '+(s.role==='Ausgabe'?'selected':'')+'>Ausgabe</option><option '+(s.role==='Vorbereitung'?'selected':'')+'>Vorbereitung</option></select></div>'+
    '<button type="button" class="btn danger small proposal-remove" data-remove-preview="'+idx+'" aria-label="Vorschlag entfernen">×</button></div>'+
-   (errors[idx]?'<div class="plan-result warning">⚠ '+esc(errors[idx])+'</div>':'');
+   (errors[idx]?'<div class="plan-result warning">⚠ '+esc(errors[idx])+'</div>':'<div class="plan-verified">✓ Entspricht der gemeldeten Verfügbarkeit</div>');
  }).join(''):'<p class="mini">Für diesen Tag noch keine neuen Vorschläge.</p>')+
  (totalErrors?'<div class="plan-result warning">'+totalErrors+' Vorschläge müssen noch korrigiert werden.</div>':'');
  el('plannerSave').disabled=plannerPreview.length===0||totalErrors>0||typeof adminData.shiftRevision!=='string';
@@ -701,6 +767,12 @@ el('plannerPreview').addEventListener('change',function(e){
  var row=e.target.closest('[data-preview-index]'),index=Number(row&&row.dataset.previewIndex);
  if(!plannerPreview[index]||['personId','from','to','role'].indexOf(field)<0)return;
  plannerPreview[index][field]=e.target.value;
+ if(field==='personId'){
+  var selectedPerson=adminData.people.find(function(p){return p.id===e.target.value});
+  var fixed=planAlignToAvailability(selectedPerson,plannerPreview[index]);
+  if(fixed){plannerPreview[index].from=fixed.from;plannerPreview[index].to=fixed.to}
+  else status('plannerMessage','Für diese Person gibt es an diesem Tag kein passendes Zeitfenster. Bitte Helfer wechseln.','bad');
+ }
  renderPlanner();
 });
 el('plannerPreview').addEventListener('click',function(e){

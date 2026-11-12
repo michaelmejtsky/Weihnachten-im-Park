@@ -78,10 +78,12 @@ function wipRequest_(action,p) {
   }
   if (action === 'adminList') {
     wipAdmin_(p);
-    return {ok:true,people:wipPeople_().map(wipAdminPerson_),shifts:wipReadShifts_(),notes:wipReadNotes_(),inventory:wipReadInventory_()};
+    const shifts=wipReadShifts_();
+    return {ok:true,people:wipPeople_().map(wipAdminPerson_),shifts:shifts,shiftRevision:wipShiftRevision_(shifts),notes:wipReadNotes_(),inventory:wipReadInventory_()};
   }
   if (action === 'signup') return wipLocked_(function(){return wipSignup_(p)});
   if (action === 'saveShift') return wipLocked_(function(){wipAdmin_(p);return wipSaveShift_(p)});
+  if (action === 'saveAutoShifts') return wipLocked_(function(){wipAdmin_(p);return wipSaveAutoShifts_(p)});
   if (action === 'deleteShift') return wipLocked_(function(){wipAdmin_(p);return wipDeleteShift_(p)});
   if (action === 'publish') return wipLocked_(function(){wipAdmin_(p);return wipPublish_(true)});
   if (action === 'unpublish') return wipLocked_(function(){wipAdmin_(p);return wipPublish_(false)});
@@ -176,6 +178,59 @@ function wipPublic_() {
     date:x.date,from:x.from,to:x.to,role:x.role,name:names[x.personId]||'Helfer:in'
   })).sort((a,b)=>a.date.localeCompare(b.date)||a.from.localeCompare(b.from)||a.role.localeCompare(b.role));
 }
+
+/**
+ * Eine ganze Vorschlagsliste in einem Schritt speichern:
+ * - niemals veröffentlichen / bestehende Einteilungen überschreiben
+ * - vorhandene Dienste müssen seit Vorschlag unverändert sein
+ * - Verfügbarkeit und Überschneidungen serverseitig prüfen
+ */
+function wipShiftRevision_(shifts) {
+  return JSON.stringify(shifts.map(s=>[
+    String(s.id),String(s.personId),String(s.date),String(s.from),String(s.to),s.published?1:0
+  ]).sort((a,b)=>a[0].localeCompare(b[0])));
+}
+function wipSaveAutoShifts_(p) {
+  const proposals=p.shifts;
+  if(!Array.isArray(proposals)||!proposals.length||proposals.length>120)
+    throw Error('Bitte zwischen 1 und 120 Vorschlagsdiensten übergeben.');
+  const current=wipReadShifts_();
+  if(typeof p.expectedRevision!=='string'||p.expectedRevision!==wipShiftRevision_(current))
+    throw Error('Der Dienstplan wurde inzwischen geändert. Bitte neu laden und Vorschlag erneut berechnen.');
+  const persons=wipPeople_();
+  const personMap={};
+  persons.forEach(person=>{personMap[person.id]=person});
+  const occupied=current.map(s=>({
+    personId:String(s.personId),date:String(s.date),from:String(s.from),to:String(s.to)
+  }));
+  const additions=[];
+  proposals.forEach((item,i)=>{
+    const personId=wipString_(item.personId,80);
+    const person=personMap[personId];
+    if(!person)throw Error('Vorschlag '+(i+1)+': Helfer nicht gefunden.');
+    const date=wipDate_(item.date),from=wipTime_(item.from),to=wipTime_(item.to);
+    wipCheckWindow_(date,from,to);
+    const available=(person.availability||[]).some(a=>
+      String(a.date)===date&&String(a.from)<=from&&String(a.to)>=to
+    );
+    if(!available)throw Error('Vorschlag '+(i+1)+' für '+person.name+': außerhalb der gemeldeten Verfügbarkeit.');
+    if(occupied.some(x=>x.personId===personId&&x.date===date&&from<x.to&&to>x.from))
+      throw Error('Vorschlag '+(i+1)+' für '+person.name+': Zeitüberschneidung. Vorschlag bitte prüfen.');
+    const role=wipString_(item.role,60)||(date==='2026-12-07'?'Abbauarbeiten':'Käsehütte');
+    const note=wipString_(item.note,250)||'Automatischer Vorschlag – bitte prüfen';
+    occupied.push({personId:personId,date:date,from:from,to:to});
+    additions.push([Utilities.getUuid(),personId,date,from,to,role,note,false,new Date()]);
+  });
+  const sheet=wipSheet_('Einteilungen');
+  const first=sheet.getLastRow()+1;
+  if(first+additions.length-1>sheet.getMaxRows()){
+    sheet.insertRowsAfter(sheet.getMaxRows(),first+additions.length-1-sheet.getMaxRows());
+  }
+  sheet.getRange(first,1,additions.length,7).setNumberFormat('@');
+  sheet.getRange(first,1,additions.length,9).setValues(additions);
+  return {ok:true,count:additions.length,message:additions.length+' neue Vorschlagsdienste als Entwurf gespeichert. Bestehende Dienste wurden nicht verändert.'};
+}
+
 function wipSaveShift_(p) {
   const person=wipFindPerson_(wipString_(p.personId,80));
   if (!person) throw Error('Helfer nicht gefunden.');

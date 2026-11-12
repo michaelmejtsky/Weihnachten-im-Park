@@ -86,6 +86,39 @@ footer{text-align:center;font-size:12px;color:#758779;padding:12px 18px 32px}
  .grinch-portrait{width:70px;height:82px;flex-basis:70px}
  .hero-topline .eyebrow{font-size:10px;letter-spacing:1.15px}
 }
+
+/* Dienstplan-Zentrale */
+.plan-day-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:14px 0 19px}
+.plan-day-card{border:1px solid #d6e3d5;border-radius:13px;background:#f9fbf7;color:#214734;padding:11px 8px;text-align:left;cursor:pointer;min-width:0}
+.plan-day-card.selected{background:#e8f2e4;border-color:#2f6b3f;box-shadow:0 0 0 2px #2f6b3f24}
+.plan-day-card strong{display:block;font-size:13px}.plan-day-card span{display:block;font-size:11px;margin:4px 0 0;color:#506958}
+.plan-day-card .shortfall{color:#a65330;font-weight:750}.plan-day-card .complete{color:#27724a;font-weight:750}
+.plan-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:14px 0}
+.plan-grid .field{margin:0}
+.plan-area{background:#f7faf5;border:1px solid #e0e9dc;border-radius:15px;padding:14px;margin:15px 0}
+.plan-area h4{margin:0 0 9px;font-size:16px}.plan-hint{color:#567060;font-size:12px;margin:7px 0}
+.coverage-row{display:grid;grid-template-columns:112px minmax(90px,1fr) 105px;align-items:center;gap:11px;padding:7px 0;border-bottom:1px solid #e4ece1;font-size:12px}
+.coverage-row:last-child{border:0}
+.coverage-row strong{font-size:12px}.coverage-meter{border-radius:999px;background:#e4e9e1;height:10px;overflow:hidden}
+.coverage-meter div{height:100%;background:#3c8251;border-radius:999px}
+.coverage-meter.low div{background:#d79246}
+.coverage-count{text-align:right;font-weight:800;font-variant-numeric:tabular-nums;color:#315f40}
+.coverage-count.low{color:#a45924}
+.plan-preview-row{display:grid;grid-template-columns:minmax(150px,1.3fr) 105px 105px minmax(110px,1fr) auto;gap:9px;align-items:center;padding:12px 0;border-top:1px solid #e0e8dc}
+.plan-preview-row select,.plan-preview-row input{width:100%;min-height:39px!important;padding:8px!important;font-size:12px!important}
+.plan-preview-row .person-name{font-size:12px;font-weight:800}
+.plan-result{font-size:12px;border-radius:10px;padding:10px;margin:8px 0}
+.plan-result.warning{background:#fff3df;color:#784b19}
+.plan-result.success{background:#e9f7ed;color:#225e3a}
+.plan-summary{font-size:13px;color:#385444;font-weight:750;margin:10px 0}
+.planner-scope{font-size:12px;color:#536b57}
+.manual-summary{cursor:pointer;font-size:17px;font-weight:800;color:#214734;list-style:none;display:flex;justify-content:space-between;align-items:center}
+.manual-summary::-webkit-details-marker{display:none}.manual-summary:after{content:"⌄";font-size:21px;color:#60816b}
+details[open]>.manual-summary:after{content:"⌃"}
+.manual-inner{padding-top:18px}
+@media(max-width:720px){.plan-day-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.plan-grid{grid-template-columns:1fr 1fr}.plan-preview-row{grid-template-columns:1fr 1fr;gap:7px}.plan-preview-row .person-name{grid-column:1/-1}.plan-preview-row .proposal-role{grid-column:1/2}.plan-preview-row .proposal-remove{grid-column:2/3;justify-self:end}}
+@media(max-width:450px){.plan-grid{grid-template-columns:1fr}.coverage-row{grid-template-columns:91px minmax(65px,1fr) 81px;gap:5px;font-size:11px}.plan-area{padding:11px}}
+
 </style>
 <script src="config.js"></script>
 </head>
@@ -197,8 +230,34 @@ footer{text-align:center;font-size:12px;color:#758779;padding:12px 18px 32px}
     <div class="actions"><button class="btn gold" id="publishBtn" type="button">✓ Plan veröffentlichen</button><button class="btn danger" id="unpublishBtn" type="button">Veröffentlichung zurücknehmen</button><button class="btn secondary" id="adminRefresh" type="button">↻ Neu laden</button></div>
     <p class="mini">Neue und bearbeitete Schichten sind zunächst Entwürfe. Erst nach dem Veröffentlichen erscheinen sie im öffentlichen Plan.</p>
    </div>
-   <div class="card">
-    <h3>Einteilung anlegen / bearbeiten</h3>
+   <div class="card" id="plannerCard">
+    <div class="sectiontag">1 · Automatische Planung</div>
+    <h3>🎯 Planungszentrale · mindestens 6 Helfer</h3>
+    <p class="intro">Der Vorschlag berücksichtigt nur gemeldete Zeiten und bereits gespeicherte Dienste. Prüfe ihn, ändere Personen oder Uhrzeiten und übernimm ihn anschließend <strong>als Entwurf</strong>.</p>
+    <div id="planDayCards" class="plan-day-cards"></div>
+    <div class="plan-grid">
+      <div class="field"><label for="plannerDay">Planungstag</label><select id="plannerDay"><option value="2026-12-04">Fr, 04.12.</option><option value="2026-12-05">Sa, 05.12.</option><option value="2026-12-06">So, 06.12.</option><option value="2026-12-07">Mo, 07.12. (Abbau)</option></select></div>
+      <div class="field"><label for="plannerMaxShift">Max. Länge je Teildienst</label><select id="plannerMaxShift"><option value="120">2 Stunden</option><option value="180">3 Stunden</option><option value="240" selected>4 Stunden</option><option value="360">6 Stunden</option></select></div>
+      <div class="field"><label for="plannerDailyMax">Max. je Person und Tag</label><select id="plannerDailyMax"><option value="240">4 Stunden</option><option value="360">6 Stunden</option><option value="480" selected>8 Stunden</option><option value="600">10 Stunden</option><option value="720">12 Stunden</option></select></div>
+    </div>
+    <div id="plannerMonday" class="field" hidden><label for="plannerMondayEnd">Montag: Bis wann soll der Abbau eingeplant werden?</label><input type="time" id="plannerMondayEnd" min="08:00" max="23:30" step="1800"><p class="hint">Nur ein Planungsende, keine offiziell festgelegte Endzeit. Abbau beginnt um 07:30 Uhr.</p></div>
+    <p class="plan-hint">Ziel: 6 Helfer gleichzeitig, geprüft in 30-Minuten-Abschnitten. Die Obergrenzen vermeiden überlange Vorschläge. Sind zu wenige passende Helfer verfügbar, bleiben sichtbare Lücken.</p>
+    <div class="actions">
+      <button class="btn primary" type="button" id="plannerGenerate">✨ Tag automatisch vorschlagen</button>
+      <button class="btn secondary" type="button" id="plannerAllDays">🎄 Fr–So auf einmal</button>
+    </div>
+    <div id="plannerMessage" aria-live="polite"></div>
+    <div class="plan-area"><h4>👥 Besetzung im Tagesverlauf</h4><p id="plannerCoverageSummary" class="plan-summary"></p><div id="plannerCoverage"></div></div>
+    <div id="plannerPreview" class="plan-area"></div>
+    <div class="actions">
+      <button class="btn gold" type="button" id="plannerSave" disabled>✓ Vorschläge als Entwürfe übernehmen</button>
+      <button class="btn outline" type="button" id="plannerDiscard" disabled>Vorschläge verwerfen</button>
+    </div>
+    <p class="planner-scope">Bereits bestehende Einteilungen bleiben unverändert. Es wird nichts automatisch veröffentlicht. Bei zwischenzeitlichen Änderungen muss der Vorschlag neu berechnet werden.</p>
+   </div>
+   <details class="card" id="manualEditor">
+    <summary class="manual-summary">✎ Einzelne Einteilung manuell anlegen / ändern</summary>
+    <div class="manual-inner">
     <form id="shiftForm">
      <div class="field"><label for="shiftPerson">Helfer:in</label><select id="shiftPerson" required><option value="">Bitte wählen</option></select></div>
      <div class="fieldgrid">
@@ -210,9 +269,10 @@ footer{text-align:center;font-size:12px;color:#758779;padding:12px 18px 32px}
      <div class="field"><label for="shiftNote">Interne Information</label><input id="shiftNote" maxlength="300" placeholder="Optional"></div>
      <div class="actions"><button class="btn primary" type="submit" id="shiftSave">Einteilung speichern</button><button class="btn outline" type="button" id="resetShift">Abbrechen / Neu</button></div>
     </form>
-   </div>
-   <div class="card"><h3>Bisherige Einteilungen</h3><div id="adminShifts"></div></div>
-   <div class="card"><h3>Verfügbarkeiten & Wünsche</h3><div id="adminPeople"></div></div><div class="card" id="notesCard"><h3>📝 Notizen & Aufgaben</h3><p class="mini">Nur für dich im Adminbereich.</p><form id="noteForm"><div class="field"><label>Titel</label><input id="noteTitle" required maxlength="120"></div><div class="field"><label>Notiz</label><textarea id="noteBody" maxlength="3000"></textarea></div><div class="field"><label>Status</label><select id="noteState"><option>Offen</option><option>Erledigt</option></select></div><div class="actions"><button class="btn primary" type="submit">Notiz speichern</button><button class="btn outline" type="button" id="noteClear">Neu</button></div></form><div id="notesList"></div></div>
+    </div>
+   </details>
+   <div class="card"><div class="spaced"><h3>📅 Bisherige Einteilungen</h3><div class="field"><label for="adminShiftFilter">Tag anzeigen</label><select id="adminShiftFilter"><option value="">Alle Tage</option><option value="2026-12-04">Fr 04.12.</option><option value="2026-12-05">Sa 05.12.</option><option value="2026-12-06">So 06.12.</option><option value="2026-12-07">Mo 07.12.</option></select></div></div><div id="adminShifts"></div></div>
+   <div class="card"><div class="spaced"><h3>🙋 Verfügbarkeiten & Wünsche</h3><div class="field"><label for="adminPeopleFilter">Helfer für Tag</label><select id="adminPeopleFilter"><option value="">Alle</option><option value="2026-12-04">Fr 04.12.</option><option value="2026-12-05">Sa 05.12.</option><option value="2026-12-06">So 06.12.</option><option value="2026-12-07">Mo 07.12.</option></select></div></div><div id="adminPeople"></div></div><div class="card" id="notesCard"><h3>📝 Notizen & Aufgaben</h3><p class="mini">Nur für dich im Adminbereich.</p><form id="noteForm"><div class="field"><label>Titel</label><input id="noteTitle" required maxlength="120"></div><div class="field"><label>Notiz</label><textarea id="noteBody" maxlength="3000"></textarea></div><div class="field"><label>Status</label><select id="noteState"><option>Offen</option><option>Erledigt</option></select></div><div class="actions"><button class="btn primary" type="submit">Notiz speichern</button><button class="btn outline" type="button" id="noteClear">Neu</button></div></form><div id="notesList"></div></div>
 <div class="card" id="inventoryCard"><h3>📦 Inventar & Einkauf</h3><p class="mini">Bestände und was noch besorgt werden muss.</p><form id="inventoryForm"><div class="field"><label>Artikel</label><input id="itemTitle" required maxlength="120"></div><div class="fieldgrid"><div class="field"><label>Kategorie</label><select id="itemCategory"><option>Geräte</option><option>Küchenutensilien</option><option>Verbrauchsmaterial</option><option>Reinigung</option><option>Lebensmittel</option><option>Getränke</option><option>Material</option><option>Sonstiges</option></select></div><div class="field"><label>Status</label><select id="itemStatus"><option>Besorgen</option><option>Zu prüfen</option><option>Weitergeleitet</option><option>Bestellt</option><option>Besorgt</option><option>Vorhanden</option></select></div><div class="field"><label>Menge</label><input id="itemAmount" inputmode="decimal"></div><div class="field"><label>Einheit</label><input id="itemUnit" maxlength="35"></div></div><div class="field"><label>Anmerkung</label><textarea id="itemNotes" maxlength="600"></textarea></div><div class="actions"><button class="btn primary" type="submit">Inventar speichern</button><button class="btn outline" type="button" id="inventoryClear">Neu</button></div></form><hr><div class="inventory-toolbar"><button id="inventoryPdf" class="btn primary" type="button">📄 PDF herunterladen</button><button id="inventoryPrint" class="btn secondary" type="button">🖨️ Druckansicht</button></div><p class="mini">PDF und Druckansicht übernehmen deine aktuelle Suche und Filterung. Druckfertig für A4.</p><div class="fieldgrid"><div class="field"><label for="itemSearch">Inventar durchsuchen</label><input id="itemSearch" type="search" placeholder="Artikel suchen …"></div><div class="field"><label for="itemFilter">Anzeigen</label><select id="itemFilter"><option value="">Alle Artikel</option><option value="Zu prüfen">Zu prüfen</option><option value="Besorgen">Besorgen</option><option value="Bestellt">Bestellt</option><option value="Vorhanden">Vorhanden</option></select></div></div><p id="inventorySummary" class="mini"></p><div id="inventoryList"></div></div>
  </div>
  <div id="adminStatus" aria-live="polite"></div>

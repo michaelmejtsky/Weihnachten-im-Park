@@ -490,6 +490,59 @@ el('publishBtn').addEventListener('click',function(){publish(true)});
 el('unpublishBtn').addEventListener('click',function(){publish(false)});
 el('adminRefresh').addEventListener('click',loadAdmin);
 
+
+/* WIP_PLANNER_CORE_BEGIN – reine Planungslogik, keine Änderungen am Backend */
+function planMinutes(t){if(!/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(String(t||'')))return NaN;var x=t.split(':').map(Number);return x[0]*60+x[1]}
+function planClock(m){return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0')}
+function planBounds(date,mondayEnd){
+ var day=DAYS.find(function(d){return d.id===date});if(!day)return null;
+ var from=planMinutes(day.start),to=planMinutes(day.teardown?mondayEnd:day.end);
+ if(!Number.isFinite(to)||to<=from||to>planMinutes(day.end)||from%30!==to%30)return null;
+ return {date:date,from:from,to:to};
+}
+function planCountAt(shifts,date,minute){
+ return new Set(shifts.filter(function(s){return s.date===date&&planMinutes(s.from)<=minute&&planMinutes(s.to)>minute}).map(function(s){return s.personId})).size;
+}
+function planAvailableAt(p,date,minute){
+ return (p.availability||[]).some(function(a){return a.date===date&&planMinutes(a.from)<=minute&&planMinutes(a.to)>minute});
+}
+function planBuildDay(date,bounds,people,existing,options){
+ if(!bounds)throw Error('Bitte für Montag zuerst ein Planungsende auswählen.');
+ var all=existing.slice(),suggested=[],target=6;
+ for(var t=bounds.from;t<bounds.to;t+=30){
+  var safety=0;
+  while(planCountAt(all,date,t)<target&&safety++<people.length+2){
+   var choices=[];
+   people.forEach(function(person){
+    var own=all.filter(function(s){return s.personId===person.id&&s.date===date});
+    if(own.some(function(s){return planMinutes(s.from)<=t&&t<planMinutes(s.to)}))return;
+    var avail=(person.availability||[]).filter(function(a){return a.date===date&&planMinutes(a.from)<=t&&planMinutes(a.to)>t});
+    if(!avail.length)return;
+    var endAvailable=Math.max.apply(null,avail.map(function(a){return planMinutes(a.to)}));
+    var used=own.reduce(function(sum,s){return sum+Math.max(0,planMinutes(s.to)-planMinutes(s.from))},0);
+    var remaining=options.dailyMax-used;
+    if(remaining<30)return;
+    var nextOwn=Math.min.apply(null,[bounds.to].concat(own.filter(function(s){return planMinutes(s.from)>t}).map(function(s){return planMinutes(s.from)})));
+    var end=Math.min(bounds.to,endAvailable,nextOwn,t+options.maxShift,t+remaining);
+    end=t+Math.floor((end-t)/30)*30;
+    if(end<=t)return;
+    var benefit=0;
+    for(var k=t;k<end;k+=30)if(planCountAt(all,date,k)<target)benefit++;
+    var total=all.filter(function(s){return s.personId===person.id}).reduce(function(sum,s){return sum+Math.max(0,planMinutes(s.to)-planMinutes(s.from))},0);
+    var score=benefit*20+(end-t)/30*5-used/30*2-total/30*.25;
+    choices.push({personId:person.id,from:t,to:end,score:score,name:person.name});
+   });
+   choices.sort(function(a,b){return b.score-a.score||a.name.localeCompare(b.name,'de')});
+   if(!choices.length)break;
+   var best=choices[0];
+   var added={personId:best.personId,date:date,from:planClock(best.from),to:planClock(best.to),role:date==='2026-12-07'?'Abbauarbeiten':'Käsehütte',note:'Automatischer Vorschlag – bitte prüfen'};
+   all.push(added);suggested.push(added);
+  }
+ }
+ return suggested;
+}
+/* WIP_PLANNER_CORE_END */
+
 function inventoryVisible(){
  var all=adminData.inventory||[],term=(el('itemSearch').value||'').trim().toLocaleLowerCase('de'),filter=el('itemFilter').value;
  var priority={'Zu prüfen':0,'Besorgen':1,'Weitergeleitet':2,'Bestellt':3,'Besorgt':4,'Vorhanden':5};

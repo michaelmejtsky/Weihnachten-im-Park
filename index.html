@@ -543,6 +543,161 @@ function planBuildDay(date,bounds,people,existing,options){
 }
 /* WIP_PLANNER_CORE_END */
 
+
+/* WIP_PLANNER_UI_BEGIN */
+function planBoundsForDay(date){return planBounds(date,el('plannerMondayEnd').value)}
+function planAllShifts(){return adminData.shifts.concat(plannerPreview)}
+function planCoverage(date){
+ var bounds=planBoundsForDay(date);if(!bounds)return null;
+ var all=planAllShifts(),people=adminData.people||[],parts=[];
+ for(var m=bounds.from;m<bounds.to;m+=30){
+  var current=planCountAt(all,date,m);
+  var possible=people.filter(function(p){return planAvailableAt(p,date,m)}).length;
+  parts.push({from:m,to:m+30,count:current,possible:possible});
+ }
+ return {bounds:bounds,parts:parts,complete:parts.filter(function(v){return v.count>=6}).length};
+}
+function planPreviewErrors(){
+ var errors={},existing=adminData.shifts.slice(),known={};
+ (adminData.people||[]).forEach(function(p){known[p.id]=p});
+ plannerPreview.forEach(function(s,i){
+  var p=known[s.personId],reason='';
+  if(!p)reason='Person nicht gefunden';
+  else if(!validSlot(s))reason='Zeit liegt außerhalb der Veranstaltungszeiten';
+  else if(!(p.availability||[]).some(function(a){return a.date===s.date&&a.from<=s.from&&a.to>=s.to}))reason='Person hat diese Zeit nicht als verfügbar gemeldet';
+  else if(existing.some(function(old){return old.personId===s.personId&&old.date===s.date&&s.from<old.to&&s.to>old.from}))reason='Zeitüberschneidung mit bestehendem oder anderem Vorschlagsdienst';
+  if(reason)errors[i]=reason;
+  existing.push(s);
+ });
+ // Überlange Tage (inklusive bereits eingeteilter Stunden) sichtbar machen.
+ var limit=Number(el('plannerDailyMax').value),totals={},indices={};
+ existing.forEach(function(s){
+  var key=s.personId+'|'+s.date,duration=planMinutes(s.to)-planMinutes(s.from);
+  totals[key]=(totals[key]||0)+(Number.isFinite(duration)?Math.max(0,duration):0);
+ });
+ plannerPreview.forEach(function(s,i){
+  var key=s.personId+'|'+s.date;
+  if(totals[key]>limit&&!errors[i])errors[i]='Tageslimit '+(limit/60)+' Std. überschritten – bitte Zeiten oder Limit ändern';
+ });
+ return errors;
+}
+function planCoverageRows(report){
+ var lines=[],cells=report.parts;
+ cells.forEach(function(part){
+  var last=lines[lines.length-1];
+  if(last&&last.count===part.count&&last.possible===part.possible&&last.to===part.from)last.to=part.to;
+  else lines.push({from:part.from,to:part.to,count:part.count,possible:part.possible});
+ });
+ return lines.map(function(r){
+  var low=r.count<6,pct=Math.max(0,Math.min(100,r.count/6*100));
+  return '<div class="coverage-row"><strong>'+planClock(r.from)+'–'+planClock(r.to)+'</strong><div class="coverage-meter '+(low?'low':'')+'"><div style="width:'+pct+'%"></div></div><div class="coverage-count '+(low?'low':'')+'">'+r.count+' / 6'+(low?' ⚠':' ✓')+'</div></div>'+(low?'<p class="plan-hint" style="margin:0 0 5px">Zu dieser Zeit haben '+r.possible+' Helfer Verfügbarkeit gemeldet.</p>':'');
+ }).join('');
+}
+function planTimeOptions(day){
+ return (adminData.people||[]).slice().sort(function(a,b){return a.name.localeCompare(b.name,'de')}).map(function(p){return '<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>'}).join('');
+}
+function renderPlanner(){
+ var selected=el('plannerDay').value,day=DAYS.find(function(d){return d.id===selected})||DAYS[0];
+ el('plannerMonday').hidden=!day.teardown;
+ el('planDayCards').innerHTML=DAYS.map(function(d){
+  var cov=planCoverage(d.id),selectedClass=d.id===selected?' selected':'',pending=plannerPreview.filter(function(s){return s.date===d.id}).length;
+  var stat=cov?(cov.complete===cov.parts.length?'✓ durchgehend gedeckt':cov.complete+' / '+cov.parts.length+' Abschnitte gedeckt'):'Ende festlegen';
+  return '<button type="button" class="plan-day-card'+selectedClass+'" data-planday="'+d.id+'"><strong>'+esc(d.name)+' · '+esc(d.short.slice(4))+'</strong><span class="'+(cov&&cov.complete===cov.parts.length?'complete':'shortfall')+'">'+esc(stat)+'</span>'+(pending?'<span>'+pending+' neue Vorschläge</span>':'')+'</button>';
+ }).join('');
+ var report=planCoverage(selected);
+ if(report){
+  var gaps=report.parts.length-report.complete;
+  el('plannerCoverageSummary').textContent=report.complete+' von '+report.parts.length+' halbstündigen Abschnitten mit mindestens 6 Helfern besetzt'+(gaps?' · '+gaps+' Abschnitte noch zu schwach':' · Ziel erreicht')+' (inklusive Entwürfe und Vorschläge).';
+  el('plannerCoverage').innerHTML=planCoverageRows(report);
+ }else{
+  el('plannerCoverageSummary').textContent='Montag: Bitte erst ein Planungsende festlegen. Beginn des Abbaus ist 07:30 Uhr.';
+  el('plannerCoverage').innerHTML='';
+ }
+ var errors=planPreviewErrors(),rows=plannerPreview.map(function(s,i){return {entry:s,index:i}}).filter(function(v){return v.entry.date===selected});
+ var totalErrors=Object.keys(errors).length;
+ el('plannerPreview').innerHTML='<div class="spaced"><h4>📝 Automatischer Vorschlag · '+esc(dayName(selected))+'</h4><span class="pill draft">'+plannerPreview.length+' Vorschläge gesamt</span></div>'+
+ (plannerPreview.length?'<p class="plan-hint">Du kannst Helfer und Zeiten direkt ändern oder Zeilen entfernen. Gespeichert werden erst alle Vorschläge gemeinsam nach deiner Bestätigung.</p>':'<p class="plan-hint">Noch kein Vorschlag berechnet. Klicke auf „Tag automatisch vorschlagen“. Vorhandene Dienste werden berücksichtigt.</p>')+
+ (rows.length?rows.map(function(v){
+  var s=v.entry,idx=v.index;
+  var options=(adminData.people||[]).slice().sort(function(a,b){return a.name.localeCompare(b.name,'de')}).map(function(p){return '<option value="'+esc(p.id)+'" '+(p.id===s.personId?'selected':'')+'>'+esc(p.name)+'</option>'}).join('');
+  return '<div class="plan-preview-row" data-preview-index="'+idx+'"><div><label class="person-name">Helfer:in</label><select aria-label="Helfer ändern" data-propfield="personId">'+options+'</select></div>'+
+   '<div><label>Von</label><input type="time" data-propfield="from" value="'+esc(s.from)+'"></div><div><label>Bis</label><input type="time" data-propfield="to" value="'+esc(s.to)+'"></div>'+
+   '<div class="proposal-role"><label>Bereich</label><select data-propfield="role"><option '+(s.role==='Käsehütte'?'selected':'')+'>Käsehütte</option><option '+(s.role==='Abbauarbeiten'?'selected':'')+'>Abbauarbeiten</option><option '+(s.role==='Verkauf'?'selected':'')+'>Verkauf</option><option '+(s.role==='Ausgabe'?'selected':'')+'>Ausgabe</option><option '+(s.role==='Vorbereitung'?'selected':'')+'>Vorbereitung</option></select></div>'+
+   '<button type="button" class="btn danger small proposal-remove" data-remove-preview="'+idx+'" aria-label="Vorschlag entfernen">×</button></div>'+
+   (errors[idx]?'<div class="plan-result warning">⚠ '+esc(errors[idx])+'</div>':'');
+ }).join(''):'<p class="mini">Für diesen Tag noch keine neuen Vorschläge.</p>')+
+ (totalErrors?'<div class="plan-result warning">'+totalErrors+' Vorschläge müssen noch korrigiert werden.</div>':'');
+ el('plannerSave').disabled=plannerPreview.length===0||totalErrors>0||typeof adminData.shiftRevision!=='string';
+ el('plannerDiscard').disabled=plannerPreview.length===0;
+ if(plannerPreview.length&&typeof adminData.shiftRevision!=='string')
+  el('plannerPreview').innerHTML+='<div class="plan-result warning">⚠ Der Apps-Script-Code muss auf die aktuelle Version aktualisiert werden, damit Vorschläge gesammelt gespeichert werden können.</div>';
+}
+function planSuggestDays(dates){
+ var maxShift=Number(el('plannerMaxShift').value),dailyMax=Number(el('plannerDailyMax').value);
+ var retained=plannerPreview.filter(function(s){return dates.indexOf(s.date)<0});
+ var proposed=retained.slice(),counts=[];
+ try{
+  dates.forEach(function(date){
+   var bounds=planBoundsForDay(date);
+   if(!bounds)throw Error('Für den Abbautag Montag bitte zuerst eine Endzeit für die Planung auswählen.');
+   var next=planBuildDay(date,bounds,adminData.people,adminData.shifts.concat(proposed),{maxShift:maxShift,dailyMax:dailyMax});
+   proposed=proposed.concat(next);
+   counts.push(dayName(date)+': '+next.length+' Schichten');
+  });
+  plannerPreview=proposed;
+  var selected=dates[0];
+  el('plannerDay').value=selected;
+  el('adminShiftFilter').value=selected;
+  el('adminPeopleFilter').value=selected;
+  renderAdmin();
+  var warnings=dates.map(function(date){var r=planCoverage(date);return r?(r.parts.length-r.complete):0}).reduce(function(a,b){return a+b},0);
+  status('plannerMessage','Vorschlag erstellt: '+counts.join(' · ')+(warnings?' · Achtung: '+warnings+' halbstündige Abschnitte weiterhin unterbesetzt.':' · Mindestbesetzung in allen geplanten Abschnitten erreicht.'),warnings?'':'good');
+ }catch(err){status('plannerMessage',err.message,'bad')}
+}
+function planSelectDay(date){
+ el('plannerDay').value=date;el('adminShiftFilter').value=date;el('adminPeopleFilter').value=date;
+ renderAdmin();
+}
+el('planDayCards').addEventListener('click',function(e){var b=e.target.closest('[data-planday]');if(b)planSelectDay(b.dataset.planday)});
+el('plannerDay').addEventListener('change',function(){planSelectDay(this.value)});
+el('plannerMondayEnd').addEventListener('change',renderPlanner);
+el('plannerMaxShift').addEventListener('change',renderPlanner);
+el('plannerDailyMax').addEventListener('change',renderPlanner);
+el('plannerGenerate').addEventListener('click',function(){planSuggestDays([el('plannerDay').value])});
+el('plannerAllDays').addEventListener('click',function(){planSuggestDays(DAYS.filter(function(d){return !d.teardown}).map(function(d){return d.id}))});
+el('plannerDiscard').addEventListener('click',function(){if(!confirm('Alle noch nicht gespeicherten Vorschläge verwerfen?'))return;plannerPreview=[];status('plannerMessage','Vorschläge verworfen. Bestehende Dienste unverändert.');renderPlanner()});
+el('plannerPreview').addEventListener('change',function(e){
+ var field=e.target.dataset.propfield;if(!field)return;
+ var row=e.target.closest('[data-preview-index]'),index=Number(row&&row.dataset.previewIndex);
+ if(!plannerPreview[index]||['personId','from','to','role'].indexOf(field)<0)return;
+ plannerPreview[index][field]=e.target.value;
+ renderPlanner();
+});
+el('plannerPreview').addEventListener('click',function(e){
+ var b=e.target.closest('[data-remove-preview]');if(!b)return;
+ plannerPreview.splice(Number(b.dataset.removePreview),1);renderPlanner();
+});
+el('plannerSave').addEventListener('click',async function(){
+ if(!plannerPreview.length)return;
+ var errors=planPreviewErrors();
+ if(Object.keys(errors).length){status('plannerMessage','Bitte zuerst alle Fehler in den Vorschlägen korrigieren.','bad');return}
+ if(typeof adminData.shiftRevision!=='string'){status('plannerMessage','Bitte die aktualisierte Code.gs im Apps Script bereitstellen.','bad');return}
+ var uniqueDays=[...new Set(plannerPreview.map(function(s){return s.date}))];
+ var gaps=uniqueDays.reduce(function(sum,d){var c=planCoverage(d);return sum+(c?c.parts.length-c.complete:0)},0);
+ var msg=plannerPreview.length+' neue Schichten als Entwurf speichern? Bereits bestehende Einteilungen bleiben erhalten. Es wird nichts veröffentlicht.';
+ if(gaps)msg+='\n\nAchtung: In '+gaps+' halbstündigen Zeitabschnitten werden weniger als 6 Personen gleichzeitig eingeteilt sein. Trotzdem als Entwurf speichern?';
+ if(!confirm(msg))return;
+ var b=el('plannerSave');b.disabled=true;b.textContent='Wird gespeichert …';
+ try{
+  var r=await call('saveAutoShifts',{adminKey:adminKey,expectedRevision:adminData.shiftRevision,shifts:plannerPreview});
+  await loadAdmin();
+  status('adminStatus',r.message+' Du kannst die Einteilungen jetzt unter „Bisherige Einteilungen“ bearbeiten. Veröffentlicht wird erst nach deinem Klick auf „Plan veröffentlichen“.','good');
+  status('plannerMessage','Gespeichert: '+r.count+' neue Entwürfe.','good');
+ }catch(err){status('plannerMessage',err.message,'bad')}
+ finally{b.textContent='✓ Vorschläge als Entwürfe übernehmen';renderPlanner()}
+});
+/* WIP_PLANNER_UI_END */
+
 function inventoryVisible(){
  var all=adminData.inventory||[],term=(el('itemSearch').value||'').trim().toLocaleLowerCase('de'),filter=el('itemFilter').value;
  var priority={'Zu prüfen':0,'Besorgen':1,'Weitergeleitet':2,'Bestellt':3,'Besorgt':4,'Vorhanden':5};

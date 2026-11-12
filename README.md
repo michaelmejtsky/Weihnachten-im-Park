@@ -110,3 +110,18 @@ Die Automatik behandelt **sechs gleichzeitig eingesetzte Helfer als Zielgröße,
 6. Vorschläge sind weiterhin nur Entwürfe. Erst nach manueller Prüfung und ausdrücklichem Speichern beziehungsweise Veröffentlichen werden sie verbindlich.
 
 Regressionstest mit dem vorhandenen Datenbestand: Freitag **10/10**, Samstag **7/7**, Sonntag **5/5** angemeldete Helfer berücksichtigt; keine unnötigen Teilungen, keine Überschreitungen der gemeldeten Zeiten oder Belegung über sechs in den geprüften Halbstunden. Die Mindestzahl von sechs lässt sich in den bestehenden Anmeldungen nicht durchgehend erreichen.
+
+
+## Visuelle Dienstkarte und A4-Druckausgabe
+
+Im Admin-Bereich **Verwaltung → Planungszentrale → Visuelle Dienstkarte** werden die ausgewählten Tage live aus den bestehenden Einteilungen **und** den noch nicht gespeicherten Vorschlägen dargestellt.
+
+- **Zeitachse** über den Veranstaltungszeitraum und **farbige Personalstärke pro Zeitabschnitt**: rot 0–3, orange 4–5, grün genau 6, blau 7+ gleichzeitig anwesende Personen.
+- **Ein Balken je Helfer** (gegebenenfalls mehrere Dienstbalken derselben Person) mit konkreten Beginn-/Endzeiten. **Grün** kennzeichnet gespeicherte Dienste, **Gold gestrichelt** noch nicht gespeicherte Vorschläge; ungültige Verfügbarkeiten werden rot markiert.
+- **Kommt-/Geht-Liste** chronologisch mit Uhrzeit, Personennamen und der danach anwesenden Anzahl. Parallele Dienstbalken machen Überschneidungen sichtbar.
+- Zahlen für **eingeplante Personen, Unterbesetzungs-/Überbesetzungsdauer, maximale gleichzeitige Besetzung und Wechselzeiten** sowie noch nicht eingeplante Reserve-Helfer.
+- **„Diesen Tag drucken“** und **„Alle Tage drucken / als PDF“** öffnen einen eigenen, schön gestalteten **A4-Querformat-Druckbericht**. Dieser enthält die Grafik, die Kommt-/Geht-Übergänge und eine tabellarische Liste aller geplanten Dienste mit veröffentlicht/Entwurf/Vorschlag als Kennzeichnung. Im geöffneten Fenster auf **Drucken / Als PDF speichern** klicken; Browser kann den Ausdruck als PDF ablegen.
+- Für **Montag, 07.12. (Abbau)** bleibt das Ende offen. Bei gewähltem Planungsende wird die Zeitachse entsprechend dargestellt. Bei vorhandenen Diensten ohne festes Ende läuft die Grafik nur bis zum letzten eingetragenen Dienst und bezeichnet dies ausdrücklich **nicht als offizielles Abbauende**.
+- Die Grafik und die vollständige Druckversion sind **ausschließlich im geschützten Adminbereich** verfügbar. Keine private Telefonnummer wird mit ausgegeben. Entwürfe werden deutlich markiert und **nicht** durch Drucken automatisch veröffentlicht.
+
+Diese Version benötigt **keine neue Apps-Script-Bereitstellung** für die rein visuelle Darstellung oder den lokalen Browser-Druck. Für das **gemeinsame Speichern** neuer Vorschläge gilt weiterhin die Voraussetzung, dass die aktuelle `Code.gs` bereitgestellt ist.

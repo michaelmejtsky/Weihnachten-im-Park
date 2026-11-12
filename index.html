@@ -125,6 +125,51 @@ details[open]>.manual-summary:after{content:"⌃"}
 .admin-kpi span{font-size:12px;color:#607267;display:block;margin-top:5px}
 @media(max-width:540px){.admin-kpi{padding:10px}.admin-kpi strong{font-size:20px}.admin-kpi span{font-size:11px}}
 .plan-availability{display:block;font-size:11px;font-weight:750;color:#287044;margin-top:6px;line-height:1.4}.plan-preview-row.invalid{border:1px solid #e9bf91;border-radius:10px;padding:10px;background:#fff7ee}.plan-availability.invalid{color:#a44b25}.plan-verified{font-size:11px;font-weight:800;color:#246e3f;background:#e7f5e9;border-radius:8px;padding:5px 9px;margin:5px 0 11px;display:inline-block}
+
+/* Interne visuelle Dienstkarte: halbstündige Besetzung, Dienstbalken und Übergaben */
+.viz-card{background:linear-gradient(135deg,#fbfcf8,#f3f8f0);border:1px solid #d9e6d6;border-radius:18px;padding:18px;margin:16px 0}
+.viz-title{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.viz-title h4{font-size:18px;margin:0 0 5px;color:#183f2a}
+.viz-title p{margin:0;font-size:12px;color:#607364}
+.viz-legend{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin:13px 0;font-size:11px;color:#4c6754}
+.viz-legend span{display:inline-flex;align-items:center;gap:5px}
+.viz-dot{display:inline-block;height:11px;width:11px;border-radius:3px}
+.viz-low{background:#c55550}.viz-mid{background:#e3a245}.viz-good{background:#3d9564}.viz-over{background:#4c83b9}
+.viz-print-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.viz-scroller{overflow-x:auto;overscroll-behavior-x:contain;border:1px solid #dee9db;border-radius:13px;background:#fff;margin:13px 0}
+.viz-inner{min-width:710px;padding:13px 11px 12px}
+.viz-line{display:grid;grid-template-columns:146px minmax(0,1fr);gap:10px;align-items:center}
+.viz-label{min-width:0;color:#24523a;font-size:11px;font-weight:800;white-space:normal}
+.viz-label small{font-weight:550;color:#65786a;display:block;font-size:10px;margin-top:3px}
+.viz-track{position:relative;height:28px}
+.viz-axis{height:21px;margin-bottom:6px;border-bottom:1px solid #e7ebe2}
+.viz-axis span{position:absolute;top:0;transform:translateX(-50%);color:#65806e;font-size:10px;white-space:nowrap}
+.viz-axis span.first{transform:none}.viz-axis span.last{transform:translateX(-100%)}
+.viz-grid{position:absolute;inset:0;pointer-events:none}
+.viz-grid i{position:absolute;top:0;bottom:0;border-left:1px dashed #e3e9df}
+.viz-cover-strip{display:flex;gap:2px;width:100%;height:25px}
+.viz-cover-strip span{height:25px;flex:1;min-width:0;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:800;cursor:default}
+.viz-cover-strip span.low{background:#c55550}
+.viz-cover-strip span.mid{background:#d89736}
+.viz-cover-strip span.good{background:#398e60}
+.viz-cover-strip span.over{background:#4b7db1}
+.viz-helper-row{min-height:38px;padding:4px 0;border-bottom:1px solid #edf0e9}
+.viz-helper-row .viz-track{height:30px;background:#f4f7f2;border-radius:6px}
+.viz-person-name{overflow-wrap:anywhere}
+.viz-bar{position:absolute;top:4px;height:22px;min-width:2px;background:#2e7350;border-radius:5px;display:flex;align-items:center;justify-content:center;overflow:hidden;color:#fff;white-space:nowrap;font-size:10px;font-weight:800;padding:0 3px}
+.viz-bar.draft{background:repeating-linear-gradient(135deg,#d9a349,#d9a349 9px,#c48f3d 9px,#c48f3d 18px);border:1px dashed #8c662e}
+.viz-bar.bad{background:#c55550}
+.viz-bar small{font-size:9px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.viz-metrics{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.viz-metrics span{font-size:11px;padding:7px 10px;border:1px solid #dfe8db;background:#fff;border-radius:8px;font-weight:750;color:#295239}
+.viz-handover{display:grid;grid-template-columns:67px 1fr;gap:10px;padding:9px 0;border-top:1px solid #e4e9e1;font-size:12px}
+.viz-handover time{font-weight:900;color:#214f34}
+.viz-handover strong{font-size:12px}.viz-handover .arrival{color:#217247}.viz-handover .departure{color:#a34f35}
+.viz-handover .headcount{font-size:11px;color:#647768;display:block;margin-top:3px}
+.viz-alert{background:#fff0db;color:#855321;border-radius:10px;padding:12px;font-size:12px;margin:10px 0}
+.viz-empty{padding:20px;font-size:13px;color:#6c7d6f}
+@media(max-width:540px){.viz-card{padding:12px}.viz-title h4{font-size:16px}.viz-print-actions .btn{min-height:38px;font-size:12px}}
+
 </style>
 <script src="config.js"></script>
 </head>
@@ -254,6 +299,23 @@ details[open]>.manual-summary:after{content:"⌃"}
     </div>
     <div id="plannerMessage" aria-live="polite"></div>
     <div class="plan-area"><h4>👥 Besetzung im Tagesverlauf</h4><p id="plannerCoverageSummary" class="plan-summary"></p><div id="plannerCoverage"></div></div>
+    <div class="viz-card" id="visualPlanCard">
+      <div class="viz-title"><div><h4>📊 Visuelle Dienstkarte · Kommt & Geht</h4><p>Live-Ansicht für den ausgewählten Tag. Grüne Balken sind gespeicherte Dienste, goldene Balken neue Vorschläge.</p></div>
+        <div class="viz-print-actions">
+          <button class="btn secondary small" id="visualPrintDay" type="button">🖨️ Diesen Tag drucken</button>
+          <button class="btn outline small" id="visualPrintAll" type="button">📄 Alle Tage drucken / als PDF</button>
+        </div>
+      </div>
+      <div class="viz-legend">
+        <span><i class="viz-dot viz-low"></i>0–3 Helfer</span>
+        <span><i class="viz-dot viz-mid"></i>4–5 Helfer</span>
+        <span><i class="viz-dot viz-good"></i>6 Helfer</span>
+        <span><i class="viz-dot viz-over"></i>7+ Helfer</span>
+        <span><i class="viz-dot" style="background:#d9a349"></i>Neuer Vorschlag</span>
+      </div>
+      <div id="visualPlanMap"></div>
+      <div id="visualPlanEvents"></div>
+    </div>
     <div id="plannerPreview" class="plan-area"></div>
     <div class="actions">
       <button class="btn gold" type="button" id="plannerSave" disabled>✓ Vorschläge als Entwürfe übernehmen</button>

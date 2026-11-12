@@ -239,7 +239,7 @@ details[open]>.manual-summary:after{content:"⌃"}
    <div class="card" id="plannerCard">
     <div class="sectiontag">1 · Automatische Planung</div>
     <h3>🎯 Planungszentrale · mindestens 6 Helfer</h3>
-    <p class="intro">Der Vorschlag berücksichtigt nur gemeldete Zeiten und bereits gespeicherte Dienste. Prüfe ihn, ändere Personen oder Uhrzeiten und übernimm ihn anschließend <strong>als Entwurf</strong>.</p>
+    <p class="intro">Die Automatik berücksichtigt <strong>alle angemeldeten Helfer eines Tages</strong>, verteilt möglichst faire, zusammenhängende Dienste und vermeidet unnötige Überbesetzung. <strong>6 Helfer sind das Mindestziel, nicht die Obergrenze.</strong> Prüfe den Vorschlag und übernimm ihn anschließend als Entwurf.</p>
     <div id="planDayCards" class="plan-day-cards"></div>
     <div class="plan-grid">
       <div class="field"><label for="plannerDay">Planungstag</label><select id="plannerDay"><option value="2026-12-04">Fr, 04.12.</option><option value="2026-12-05">Sa, 05.12.</option><option value="2026-12-06">So, 06.12.</option><option value="2026-12-07">Mo, 07.12. (Abbau)</option></select></div>
@@ -247,7 +247,7 @@ details[open]>.manual-summary:after{content:"⌃"}
       <div class="field"><label for="plannerDailyMax">Max. je Person und Tag</label><select id="plannerDailyMax"><option value="480">8 Stunden</option><option value="600">10 Stunden</option><option value="720" selected>12 Stunden</option></select></div>
     </div>
     <div id="plannerMonday" class="field" hidden><label for="plannerMondayEnd">Montag: Bis wann soll der Abbau eingeplant werden?</label><input type="time" id="plannerMondayEnd" min="08:00" max="23:30" step="1800"><p class="hint">Nur ein Planungsende, keine offiziell festgelegte Endzeit. Abbau beginnt um 07:30 Uhr.</p></div>
-    <p class="plan-hint">Ziel: 6 Helfer gleichzeitig. Die Automatik bevorzugt einen einzigen langen, zusammenhängenden Dienst je Person statt unnötiger Teilungen. Angegebene Verfügbarkeiten sind verbindliche Grenzen. Fehlende Helfer werden als Lücke angezeigt.</p>
+    <p class="plan-hint">Ziel: möglichst 6 Helfer gleichzeitig, mit sinnvollen Wechseln und etwa 2 Stunden Mindestdauer, sofern die gemeldete Verfügbarkeit reicht. Alle Anmeldungen werden geprüft; wer ohne sinnvollen Einsatz bleibt, wird ausdrücklich als Reserve angezeigt. Freiwillige werden nie außerhalb ihrer gemeldeten Zeiten eingeteilt.</p>
     <div class="actions">
       <button class="btn primary" type="button" id="plannerGenerate">✨ Tag automatisch vorschlagen</button>
       <button class="btn secondary" type="button" id="plannerAllDays">🎄 Fr–So auf einmal</button>
@@ -725,18 +725,26 @@ function planCoverageRows(report){
 function planTimeOptions(day){
  return (adminData.people||[]).slice().sort(function(a,b){return a.name.localeCompare(b.name,'de')}).map(function(p){return '<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>'}).join('');
 }
+function planParticipation(date){
+ var bounds=planBoundsForDay(date);
+ if(!bounds)return {eligible:[],assigned:[],reserve:[]};
+ var eligible=(adminData.people||[]).filter(function(p){return planMergedWindows(p,date,bounds).length>0});
+ var current=planAllShifts().filter(function(s){return s.date===date});
+ var used=new Set(current.map(function(s){return s.personId}));
+ return {eligible:eligible,assigned:eligible.filter(function(p){return used.has(p.id)}),reserve:eligible.filter(function(p){return !used.has(p.id)})};
+}
 function renderPlanner(){
  var selected=el('plannerDay').value,day=DAYS.find(function(d){return d.id===selected})||DAYS[0];
  el('plannerMonday').hidden=!day.teardown;
  el('planDayCards').innerHTML=DAYS.map(function(d){
-  var cov=planCoverage(d.id),selectedClass=d.id===selected?' selected':'',pending=plannerPreview.filter(function(s){return s.date===d.id}).length;
+  var cov=planCoverage(d.id),part=planParticipation(d.id),selectedClass=d.id===selected?' selected':'',pending=plannerPreview.filter(function(s){return s.date===d.id}).length;
   var stat=cov?(cov.complete===cov.parts.length?'✓ durchgehend gedeckt':cov.complete+' / '+cov.parts.length+' Abschnitte gedeckt'):'Ende festlegen';
-  return '<button type="button" class="plan-day-card'+selectedClass+'" data-planday="'+d.id+'"><strong>'+esc(d.name)+' · '+esc(d.short.slice(4))+'</strong><span class="'+(cov&&cov.complete===cov.parts.length?'complete':'shortfall')+'">'+esc(stat)+'</span>'+(pending?'<span>'+pending+' neue Vorschläge</span>':'')+'</button>';
+  return '<button type="button" class="plan-day-card'+selectedClass+'" data-planday="'+d.id+'"><strong>'+esc(d.name)+' · '+esc(d.short.slice(4))+'</strong><span class="'+(cov&&cov.complete===cov.parts.length?'complete':'shortfall')+'">'+esc(stat)+'</span>'+(cov?'<span><strong>'+part.assigned.length+' / '+part.eligible.length+'</strong> Helfer eingeplant</span>':'')+(pending?'<span>'+pending+' neue Vorschläge</span>':'')+'</button>';
  }).join('');
- var report=planCoverage(selected);
+ var report=planCoverage(selected),participation=planParticipation(selected);
  if(report){
   var gaps=report.parts.length-report.complete;
-  el('plannerCoverageSummary').textContent=report.complete+' von '+report.parts.length+' halbstündigen Abschnitten mit mindestens 6 Helfern besetzt'+(gaps?' · '+gaps+' Abschnitte noch zu schwach':' · Ziel erreicht')+' (inklusive Entwürfe und Vorschläge).';
+  el('plannerCoverageSummary').textContent=participation.assigned.length+' von '+participation.eligible.length+' angemeldeten Helfern eingeplant · '+report.complete+' von '+report.parts.length+' halbstündigen Abschnitten mit mindestens 6 Helfern besetzt'+(gaps?' · '+gaps+' Abschnitte noch zu schwach':' · Ziel erreicht')+'.';
   el('plannerCoverage').innerHTML=planCoverageRows(report);
  }else{
   el('plannerCoverageSummary').textContent='Montag: Bitte erst ein Planungsende festlegen. Beginn des Abbaus ist 07:30 Uhr.';
@@ -757,6 +765,7 @@ function renderPlanner(){
    '<button type="button" class="btn danger small proposal-remove" data-remove-preview="'+idx+'" aria-label="Vorschlag entfernen">×</button></div>'+
    (errors[idx]?'<div class="plan-result warning">⚠ '+esc(errors[idx])+'</div>':'<div class="plan-verified">✓ Entspricht der gemeldeten Verfügbarkeit</div>');
  }).join(''):'<p class="mini">Für diesen Tag noch keine neuen Vorschläge.</p>')+
+ (participation.reserve.length&&(plannerPreview.length||adminData.shifts.some(function(s){return s.date===selected}))?'<div class="plan-result warning">Noch ohne Dienst / Reserve ('+participation.reserve.length+'): '+esc(participation.reserve.map(function(p){return p.name}).join(', '))+'. Bitte prüfen, ob ein sinnvoller zusätzlicher oder getauschter Dienst möglich ist.</div>':'')+
  (totalErrors?'<div class="plan-result warning">'+totalErrors+' Vorschläge müssen noch korrigiert werden.</div>':'');
  el('plannerSave').disabled=plannerPreview.length===0||totalErrors>0||typeof adminData.shiftRevision!=='string';
  el('plannerDiscard').disabled=plannerPreview.length===0;
@@ -773,7 +782,9 @@ function planSuggestDays(dates){
    if(!bounds)throw Error('Für den Abbautag Montag bitte zuerst eine Endzeit für die Planung auswählen.');
    var next=planBuildDay(date,bounds,adminData.people,adminData.shifts.concat(proposed),{maxShift:maxShift,dailyMax:dailyMax});
    proposed=proposed.concat(next);
-   counts.push(dayName(date)+': '+next.length+' Schichten');
+   var eligible=adminData.people.filter(function(p){return planMergedWindows(p,date,bounds).length>0});
+   var covered=new Set(adminData.shifts.concat(proposed).filter(function(s){return s.date===date}).map(function(s){return s.personId}));
+   counts.push(dayName(date)+': '+eligible.filter(function(p){return covered.has(p.id)}).length+'/'+eligible.length+' Helfer, '+next.length+' neue Dienste');
   });
   plannerPreview=proposed;
   var selected=dates[0];

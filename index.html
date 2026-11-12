@@ -546,65 +546,81 @@ function planMergedWindows(person,date,bounds){
  return merged;
 }
 function planBuildDay(date,bounds,people,existing,options){
- if(!bounds)throw Error('Bitte für Montag zuerst ein Planungsende auswählen.');
- var all=existing.slice(),suggested=[],target=6;
+ if(!bounds)throw Error('Für Montag bitte zuerst ein Planungsende auswählen.');
  var maxShift=Math.max(30,Number(options.maxShift)||720),dailyMax=Math.max(30,Number(options.dailyMax)||720);
- // Ausgangspunkt ist die gesamte Verfügbarkeit, nicht eine künstliche 4-Stunden-Schicht.
- // Zunächst höchstens EIN neuer, zusammenhängender Dienst je Person.
- // Nur wenn das nicht reicht, darf eine bereits eingeteilte Person ergänzend helfen.
- function bestCandidate(allowSecondShift){
-  var best=null;
-  people.forEach(function(person){
-   var own=all.filter(function(s){return s.date===date&&s.personId===person.id});
-   if(own.length&&!allowSecondShift)return;
-   var used=own.reduce(function(sum,s){var len=planMinutes(s.to)-planMinutes(s.from);return sum+(Number.isFinite(len)?Math.max(0,len):0)},0);
-   var maxLen=Math.min(maxShift,dailyMax-used);
-   if(maxLen<30)return;
-   var windows=planMergedWindows(person,date,bounds);
-   windows.forEach(function(w){
-    // Bei einem 15-Minuten-Beginn auf die nächste halbe Stunde gehen.
-    var first=Math.ceil(w.from/30)*30,last=Math.floor(w.to/30)*30;
-    for(var start=first;start+30<=last;start+=30){
-     var cutoff=Math.min(last,start+maxLen);
-     var next=own.filter(function(s){return planMinutes(s.from)>=start}).map(function(s){return planMinutes(s.from)});
-     if(next.length)cutoff=Math.min(cutoff,Math.min.apply(null,next));
-     if(own.some(function(s){return planMinutes(s.from)<cutoff&&planMinutes(s.to)>start}))continue;
-     var end=start+Math.floor((cutoff-start)/30)*30;
-     if(end<=start)continue;
-     // Ein Kandidat erhält nur Punkte für Zeitabschnitte mit Personalbedarf.
-     var value=0;
-     for(var t=start;t<end;t+=30)if(planCountAt(all,date,t)<target)value++;
-     if(!value)continue;
-     // Höhere gesamte Abdeckung und lange, durchgehende Dienste bevorzugen.
-     // Ein zusätzlicher zweiter Dienst wird nur im zweiten Suchdurchgang berücksichtigt.
-     var score=value*100+(end-start)/30*0.2-(own.length?50:0);
-     if(!best||score>best.score||score===best.score&&end-start>best.to-best.from||
-       score===best.score&&end-start===best.to-best.from&&person.name.localeCompare(best.name,'de')<0){
-       best={personId:person.id,name:person.name,from:start,to:end,score:score};
-     }
-    }
-   });
+ var target=6,moments=[];
+ for(var time=bounds.from;time<bounds.to;time+=30)moments.push(time);
+ // Schon gespeicherte Einteilungen bleiben fix. Eine Person wird nur einmal gezählt.
+ var fixed=existing.filter(function(s){return s.date===date});
+ var base=moments.map(function(t){return planCountAt(fixed,date,t)});
+ var eligible=people.filter(function(p){return planMergedWindows(p,date,bounds).length>0});
+ var wantedSlots=target*moments.length/Math.max(1,eligible.length);
+ var candidates=eligible.filter(function(p){return !fixed.some(function(s){return s.personId===p.id})}).map(function(p){
+  var windows=planMergedWindows(p,date,bounds),opts=[null],seen=new Set(),cap=Math.min(maxShift,dailyMax);
+  windows.forEach(function(w){
+   var minLen=Math.min(60,w.to-w.from);
+   var starts=[w.from],ends=[w.to];
+   for(var x=Math.ceil(w.from/30)*30;x<w.to;x+=30)starts.push(x);
+   for(var x=Math.ceil(w.from/30)*30;x<w.to;x+=30)ends.push(x);
+   starts.forEach(function(start){ends.forEach(function(end){
+    if(end<=start||end-start<minLen||end-start>cap)return;
+    var key=start+'-'+end;
+    if(!seen.has(key)){seen.add(key);opts.push({from:start,to:end})}
+   })});
   });
-  return best;
+  return {person:p,opts:opts,choice:null,maxDuration:Math.max.apply(null,[0].concat(windows.map(function(w){return Math.min(cap,w.to-w.from)})))};
+ });
+ // Anfänglich jede verfügbare Person berücksichtigen; anschließend Abdeckung und
+ // Überbesetzung gemeinsam optimieren, statt nach exakt 6 Personen aufzuhören.
+ var counts=base.slice();
+ function bump(cand,delta){if(!cand)return;for(var i=0;i<moments.length;i++)if(moments[i]>=cand.from&&moments[i]<cand.to)counts[i]+=delta}
+ candidates.forEach(function(c){
+  var best=c.opts.filter(Boolean).sort(function(a,b){return (b.to-b.from)-(a.to-a.from)||a.from-b.from})[0]||null;
+  c.choice=best;bump(best,1);
+ });
+ function objective(c,cand){
+  var duration=cand?(cand.to-cand.from)/30:0;
+  var ideal=Math.min(wantedSlots,c.maxDuration/30);
+  // 6 ist ein Sollwert, keine Deckelung. Überbesetzung wird aber teuer.
+  var points=0;
+  for(var i=0;i<moments.length;i++){
+   var n=counts[i]+(cand&&moments[i]>=cand.from&&moments[i]<cand.to?1:0);
+   points+=Math.max(0,target-n)*1800+Math.max(0,n-target)*135;
+  }
+  // Fairer Lastenausgleich: eher mehrere Personen je 4–6h als wenige je 10h.
+  points+=Math.pow(duration-ideal,2)*8+duration*.3;
+  // Nicht eingesetzte Helfer werden auf der Reserveliste sichtbar, aber ein
+  // offensichtlich unnötiger Einsatz wird nicht bloß zur Vollständigkeit erzwungen.
+  if(!cand)points+=1250;
+  return points;
  }
- var limit=Math.max(1,people.length*3),tries=0;
- while(tries++<limit){
-  var best=bestCandidate(false);
-  if(!best)best=bestCandidate(true);
-  if(!best)break;
-  var added={personId:best.personId,date:date,from:planClock(best.from),to:planClock(best.to),
-    role:date==='2026-12-07'?'Abbauarbeiten':'Käsehütte',
-    note:'Automatischer Vorschlag – Verfügbarkeit geprüft'};
-  var p=people.find(function(x){return x.id===best.personId});
-  if(!p||!planMergedWindows(p,date,bounds).some(function(w){return best.from>=w.from&&best.to<=w.to}))
-   throw Error('Automatische Planung abgebrochen: Vorschlag liegt außerhalb einer gemeldeten Verfügbarkeit.');
-  if(all.some(function(s){return s.personId===added.personId&&s.date===date&&added.from<s.to&&added.to>s.from}))
-   throw Error('Automatische Planung abgebrochen: Zeitüberschneidung erkannt.');
-  all.push(added);suggested.push(added);
-  if(!Array.from({length:Math.ceil((bounds.to-bounds.from)/30)},(_,i)=>bounds.from+i*30)
-    .some(function(t){return planCountAt(all,date,t)<target}))break;
+ for(var pass=0;pass<9;pass++){
+  var improved=false;
+  var order=candidates.slice().sort(function(a,b){
+   return (b.choice?b.choice.to-b.choice.from:0)-(a.choice?a.choice.to-a.choice.from:0)||
+    a.person.name.localeCompare(b.person.name,'de');
+  });
+  if(pass%2)order.reverse();
+  order.forEach(function(c){
+   bump(c.choice,-1);
+   var old=c.choice,original=objective(c,old),best=old,bestCost=original;
+   c.opts.forEach(function(proposal){
+    var val=objective(c,proposal);
+    if(val<bestCost-0.00001){best=proposal;bestCost=val}
+   });
+   c.choice=best;bump(best,1);
+   if((!old)!==(!best)||old&&best&&(old.from!==best.from||old.to!==best.to))improved=true;
+  });
+  if(!improved)break;
  }
- return suggested;
+ var out=candidates.filter(function(c){return c.choice}).map(function(c){
+  var p=c.person,ch=c.choice,slot={personId:p.id,date:date,from:planClock(ch.from),to:planClock(ch.to),
+    role:date==='2026-12-07'?'Abbauarbeiten':'Käsehütte',note:'Automatischer Vorschlag – Verfügbarkeit geprüft'};
+  if(!planMergedWindows(p,date,bounds).some(function(w){return ch.from>=w.from&&ch.to<=w.to}))
+   throw Error('Sicherheitsprüfung: '+p.name+' liegt außerhalb der gemeldeten Zeiten.');
+  return slot;
+ });
+ return out.sort(function(a,b){return a.from.localeCompare(b.from)||a.to.localeCompare(b.to)||a.personId.localeCompare(b.personId)});
 }
 /* WIP_PLANNER_CORE_END */
 

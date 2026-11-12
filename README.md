@@ -64,3 +64,22 @@ Im geschützten Bereich **Verwaltung → Inventar & Einkauf** stehen zur Verfüg
 
 **Wichtig:** Die neue Aktion `setInventoryStatus` benötigt ein frisches Apps-Script-Deployment. Deshalb die aktualisierte `Code.gs` speichern und die bestehende Web-App über **Bereitstellungen verwalten → Neue Version → Bereitstellen** aktualisieren. Der reine GitHub-Upload genügt nicht für den neuen Speicher-Endpoint.
 
+
+## Neue Planungszentrale (Mindestbesetzung 6)
+
+Im geschützten Tab **Verwaltung** steht nun eine Planungszentrale vor der weiterhin vorhandenen manuellen Einzelbearbeitung.
+
+- Tageskarten für Freitag bis Montag und Übersicht der tatsächlichen Besetzung je 30 Minuten.
+- **6 Helfer gleichzeitig** als feste Soll-Besetzung. Fehlende Helfer werden als Besetzungslücken angezeigt; keine frei erfundenen/außerhalb ihrer Verfügbarkeit eingeteilten Personen.
+- „Tag automatisch vorschlagen“ oder „Fr–So auf einmal“: erzeugt einen Vorschlagsplan aus vorhandenen **gemeldeten Verfügbarkeiten** unter Berücksichtigung bereits eingetragener Dienste.
+- Maximaldauer je Teildienst (2–6 Stunden) und Tageslimit (4–12 Stunden) sind durch Admin auswählbar (Vorgaben: 4 bzw. 8 Stunden).
+- Für Montag (Abbau ab 07:30) muss der Admin **ein Planungsende wählen**. Das ist ausdrücklich keine bestätigte Endzeit des Abbaus.
+- Vorschlagszeilen lassen sich **vor dem Speichern** hinsichtlich Person, Zeit und Bereich ändern bzw. entfernen.
+- Einmaliges **Speichern als Entwurf** erfolgt über `saveAutoShifts` (neuer Apps-Script-Endpunkt, versionierte Bereitstellung erforderlich).
+- Sicherheitsprüfungen im Backend: gültiger Admin-Schlüssel, keine Zeitüberschneidungen oder Doppelzuteilungen, nur gemeldete Zeiten, keine Änderungen an bestehenden Einteilungen, Synchronisationsschutz bei zwischenzeitlichen Änderungen.
+- **Veröffentlichen bleibt ein separater Admin-Schritt.** Beim Veröffentlichen wird auf weniger als sechs besetzte Helfer pro Zeitabschnitt hingewiesen.
+- Im manuellen Editor lässt sich aus der Verfügbarkeitsliste mit einem Klick eine vorhandene Zeit als Vorschlag übernehmen. Helfer und bisherige Dienste sind nach Tag filterbar.
+
+**Zur Aktivierung:** In der bestehenden Apps-Script-Web-App die jeweils aktuelle `Code.gs` aus diesem Repository vollständig ersetzen, speichern, und über **Bereitstellungen verwalten → Stiftsymbol → Neue Version → Bereitstellen** aktualisieren. Der Admin-Schlüssel wird dabei nicht geändert. Das neue Frontend kann bereits Vorschläge berechnen; zur gemeinsamen Speicherung vieler Entwürfe ist das neue Backend erforderlich.
+
+**Wichtige Grenzen:** Der Algorithmus kann nur die angegebenen Zeitfenster berücksichtigen und kennt keine Pausen, fachlichen Qualifikationen oder unverbindlichen Wünsche aus Freitexten automatisch. Vorschläge immer vor der Veröffentlichung prüfen.

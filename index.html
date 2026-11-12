@@ -170,6 +170,54 @@ details[open]>.manual-summary:after{content:"⌃"}
 .viz-empty{padding:20px;font-size:13px;color:#6c7d6f}
 @media(max-width:540px){.viz-card{padding:12px}.viz-title h4{font-size:16px}.viz-print-actions .btn{min-height:38px;font-size:12px}}
 
+
+/* Öffentliche Dienstgrafik: nur fix veröffentlichte, über öffentliche API gelieferte Daten */
+.public-rota-card{border:1px solid #dfebdc;background:linear-gradient(155deg,#fff,#f3f8ef);border-radius:20px;padding:19px;margin:15px 0 22px}
+.public-rota-head{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;flex-wrap:wrap}
+.public-rota-head h3{font-size:21px;margin:0 0 5px;color:#1c4930}
+.public-rota-head p{font-size:13px;color:#617365;margin:0}
+.public-day-picker{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:16px 0}
+.public-day-picker button{background:#fff;border:1px solid #d8e3d4;border-radius:12px;color:#214c33;padding:11px 7px;text-align:center;cursor:pointer;min-width:0}
+.public-day-picker button.active{border-color:#31734b;background:#e6f2e7;box-shadow:0 0 0 2px #2f6b3f18}
+.public-day-picker strong{display:block;font-size:12px;font-weight:850}
+.public-day-picker small{display:block;color:#66796b;font-size:11px;margin-top:3px}
+.public-rota-metrics{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0}
+.public-rota-metrics span{font-size:12px;background:#fff;border:1px solid #dce8d9;border-radius:10px;padding:8px 11px;color:#315e41;font-weight:800}
+.public-rota-scroll{overflow-x:auto;overscroll-behavior-x:contain;background:#fff;border:1px solid #dfebdc;border-radius:14px;margin:14px 0 8px}
+.public-rota-inner{padding:13px;min-width:690px}
+.public-rota-line{display:grid;grid-template-columns:151px minmax(0,1fr);gap:10px;align-items:center}
+.public-rota-label{font-size:12px;font-weight:800;color:#254b35;line-height:1.3;overflow-wrap:anywhere}
+.public-rota-label small{display:block;color:#718575;font-weight:550;font-size:10px;margin-top:3px}
+.public-rota-track{height:32px;position:relative;background:#f4f8f1;border-radius:7px}
+.public-rota-axis{height:23px;margin-bottom:7px;background:transparent;border-bottom:1px solid #e0e9df}
+.public-rota-axis span{position:absolute;top:0;transform:translateX(-50%);font-size:10px;color:#667d6a;white-space:nowrap}
+.public-rota-axis span.first{transform:none}
+.public-rota-axis span.last{transform:translateX(-100%)}
+.public-rota-guide{position:absolute;inset:0;pointer-events:none}
+.public-rota-guide i{position:absolute;top:0;bottom:0;border-left:1px dashed #e1eae0}
+.public-rota-shift{padding:5px 0;border-bottom:1px solid #edf0ea}
+.public-rota-bar{position:absolute;top:5px;height:22px;background:linear-gradient(90deg,#2a6d47,#4b9361);border-radius:6px;color:#fff;display:flex;align-items:center;justify-content:center;min-width:2px;padding:0 3px;overflow:hidden}
+.public-rota-bar small{font-size:9px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:750}
+.public-rota-band{display:flex;gap:1px;height:25px}
+.public-rota-band span{display:flex;align-items:center;justify-content:center;flex:1 1 0;min-width:0;border-radius:4px;background:#e9efdf;font-size:10px;font-weight:850;color:#36573c}
+.public-rota-band span.occupied{background:#e2efdf;color:#267044}
+.public-rota-band span.busy{background:#8ac199;color:#124b32}
+.public-rota-band span.full{background:#4b9563;color:#fff}
+.public-rota-scroll-hint{font-size:11px;color:#708575;margin:4px 0}
+.public-rota-changes{padding-top:10px}
+.public-rota-changes h4{font-size:15px;color:#244c35;margin:6px 0 8px}
+.public-rota-change{border-top:1px solid #e3ebe0;padding:8px 0;display:grid;grid-template-columns:70px 1fr;gap:9px;font-size:12px}
+.public-rota-change strong{color:#244e37}
+.public-rota-change span{display:block;color:#556b5b}
+.public-rota-empty{padding:18px;text-align:center;color:#6a7d6c;font-size:13px}
+.public-rota-list-title{margin:22px 0 10px;color:#284c36;font-size:18px}
+@media(max-width:560px){
+ .public-rota-card{padding:12px;margin:10px 0 17px}
+ .public-rota-head h3{font-size:18px}
+ .public-day-picker{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .public-rota-inner{min-width:620px}
+}
+
 </style>
 <script src="config.js"></script>
 </head>
@@ -258,7 +306,19 @@ details[open]>.manual-summary:after{content:"⌃"}
  <div class="sectiontag">Veröffentlichter Plan</div><h2>Unser Dienstplan</h2>
  <p class="intro">Hier erscheinen nur die vom Organisationsteam fix freigegebenen Dienste. Bis dahin sind alle Angaben unverbindlich.</p>
  <div class="actions"><button class="btn secondary" id="refreshPlan" type="button">↻ Plan aktualisieren</button></div>
- <div id="planList" aria-live="polite"></div>
+ <div id="publicRota" class="public-rota-card" hidden>
+  <div class="public-rota-head">
+    <div>
+      <h3>🧀 Unsere Dienste auf einen Blick</h3>
+      <p>So siehst du, wann wer eingeteilt ist und wie sich die Dienste überschneiden.</p>
+    </div>
+    <button type="button" id="publicRotaPrint" class="btn outline small">🖨️ Plan drucken</button>
+  </div>
+  <div id="publicRotaDays" class="public-day-picker" aria-label="Tag für die Dienstgrafik auswählen"></div>
+  <div id="publicRotaDisplay" aria-live="polite"></div>
+</div>
+<h3 class="public-rota-list-title">📋 Alle veröffentlichten Dienste</h3>
+<div id="planList" aria-live="polite"></div>
 </section>
 <section class="panel" id="mein">
  <div class="sectiontag">Dein persönlicher Überblick</div><h2>Meine Einteilung</h2>

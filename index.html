@@ -558,7 +558,7 @@ function planBuildDay(date,bounds,people,existing,options){
  var candidates=eligible.filter(function(p){return !fixed.some(function(s){return s.personId===p.id})}).map(function(p){
   var windows=planMergedWindows(p,date,bounds),opts=[null],seen=new Set(),cap=Math.min(maxShift,dailyMax);
   windows.forEach(function(w){
-   var minLen=Math.min(60,w.to-w.from);
+   var minLen=Math.min(120,w.to-w.from);
    var starts=[w.from],ends=[w.to];
    for(var x=Math.ceil(w.from/30)*30;x<w.to;x+=30)starts.push(x);
    for(var x=Math.ceil(w.from/30)*30;x<w.to;x+=30)ends.push(x);
@@ -570,13 +570,33 @@ function planBuildDay(date,bounds,people,existing,options){
   });
   return {person:p,opts:opts,choice:null,maxDuration:Math.max.apply(null,[0].concat(windows.map(function(w){return Math.min(cap,w.to-w.from)})))};
  });
- // Anfänglich jede verfügbare Person berücksichtigen; anschließend Abdeckung und
- // Überbesetzung gemeinsam optimieren, statt nach exakt 6 Personen aufzuhören.
+ // Faire Erstverteilung: zuerst diejenigen mit engen Verfügbarkeiten,
+ // dann mit ca. gleich langen Diensten die noch offenen Abschnitte abdecken.
+ // Nie alle einfach 10 Stunden eintragen und anschließend durch Abschneiden kürzen.
  var counts=base.slice();
  function bump(cand,delta){if(!cand)return;for(var i=0;i<moments.length;i++)if(moments[i]>=cand.from&&moments[i]<cand.to)counts[i]+=delta}
- candidates.forEach(function(c){
-  var best=c.opts.filter(Boolean).sort(function(a,b){return (b.to-b.from)-(a.to-a.from)||a.from-b.from})[0]||null;
-  c.choice=best;bump(best,1);
+ candidates.slice().sort(function(a,b){
+  var am=planMergedWindows(a.person,date,bounds).reduce(function(n,w){return n+w.to-w.from},0),
+      bm=planMergedWindows(b.person,date,bounds).reduce(function(n,w){return n+w.to-w.from},0);
+  return am-bm||a.person.name.localeCompare(b.person.name,'de');
+ }).forEach(function(c){
+  var idealMinutes=Math.min(Math.min(maxShift,dailyMax),Math.max(120,Math.ceil(wantedSlots)*30));
+  var opts=c.opts.filter(function(o){return o&&o.to-o.from<=idealMinutes});
+  if(!opts.length)opts=c.opts.filter(Boolean);
+  var chosen=null,high=-Infinity;
+  opts.forEach(function(candidate){
+   var covered=0,extra=0;
+   for(var i=0;i<moments.length;i++){
+    if(moments[i]<candidate.from||moments[i]>=candidate.to)continue;
+    if(counts[i]<target)covered++;
+    else extra++;
+   }
+   var length=(candidate.to-candidate.from)/30;
+   var score=covered*1000-extra*140-Math.abs(length-Math.min(wantedSlots,c.maxDuration/30))*6+
+    length*.4-candidate.from/100000;
+   if(score>high){high=score;chosen=candidate}
+  });
+  c.choice=chosen;bump(chosen,1);
  });
  function objective(c,cand){
   var duration=cand?(cand.to-cand.from)/30:0;

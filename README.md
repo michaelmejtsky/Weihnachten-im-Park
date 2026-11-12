@@ -96,3 +96,17 @@ Im geschützten Tab **Verwaltung** steht nun eine Planungszentrale vor der weite
 - Testfälle: 12 Helfer ganztägig → 6 ungeteilte Dienste 13–23 Uhr; 6 Helfer erst ab 16 Uhr → ausschließlich Vorschläge ab 16 Uhr. Mit realen Anmeldungen wurden keine ungültigen Vorschläge und keine unnötigen Teilungen gefunden.
 
 Diese Änderung betrifft die `index.html`. Für das gemeinsame Speichern über `saveAutoShifts` muss weiterhin die aktuelle `Code.gs` als neue Apps-Script-Version bereitgestellt sein.
+
+
+## Faire Rotation – alle angemeldeten Helfer prüfen (November 2026)
+
+Die Automatik behandelt **sechs gleichzeitig eingesetzte Helfer als Zielgröße, nicht als Anzahl zu berücksichtigender Personen**.
+
+1. Alle Helfer mit gültiger Verfügbarkeit am jeweiligen Tag werden in die Berechnung aufgenommen, bereits gespeicherte Dienste bleiben bestehen.
+2. Zunächst werden kürzere/engere Verfügbarkeiten beachtet, damit auch Helfer mit wenigen möglichen Stunden zum Zug kommen.
+3. Die Automatik verteilt möglichst lange, **einmalige, zusammenhängende Dienste**, typischerweise mindestens zwei Stunden, sofern die Verfügbarkeit das zulässt. Die individuell eingestellten Obergrenzen (standardmäßig zwölf Stunden) bleiben gültig.
+4. Danach verbessert eine Besetzungsoptimierung die Abdeckung von sechs Personen und reduziert unnötige Überbesetzung sowie große Unterschiede in der Einsatzdauer.
+5. Die Anzeige nennt **angemeldet / eingeplant** und zeigt nicht eingesetzte Helfer ausdrücklich als **Reserve**. Zeitlücken mit weniger als sechs Helfern bleiben sichtbar; keine Person wird außerhalb ihrer gemeldeten Verfügbarkeit geplant.
+6. Vorschläge sind weiterhin nur Entwürfe. Erst nach manueller Prüfung und ausdrücklichem Speichern beziehungsweise Veröffentlichen werden sie verbindlich.
+
+Regressionstest mit dem vorhandenen Datenbestand: Freitag **10/10**, Samstag **7/7**, Sonntag **5/5** angemeldete Helfer berücksichtigt; keine unnötigen Teilungen, keine Überschreitungen der gemeldeten Zeiten oder Belegung über sechs in den geprüften Halbstunden. Die Mindestzahl von sechs lässt sich in den bestehenden Anmeldungen nicht durchgehend erreichen.

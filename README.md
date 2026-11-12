@@ -83,3 +83,16 @@ Im geschützten Tab **Verwaltung** steht nun eine Planungszentrale vor der weite
 **Zur Aktivierung:** In der bestehenden Apps-Script-Web-App die jeweils aktuelle `Code.gs` aus diesem Repository vollständig ersetzen, speichern, und über **Bereitstellungen verwalten → Stiftsymbol → Neue Version → Bereitstellen** aktualisieren. Der Admin-Schlüssel wird dabei nicht geändert. Das neue Frontend kann bereits Vorschläge berechnen; zur gemeinsamen Speicherung vieler Entwürfe ist das neue Backend erforderlich.
 
 **Wichtige Grenzen:** Der Algorithmus kann nur die angegebenen Zeitfenster berücksichtigen und kennt keine Pausen, fachlichen Qualifikationen oder unverbindlichen Wünsche aus Freitexten automatisch. Vorschläge immer vor der Veröffentlichung prüfen.
+
+
+## Planungsänderung – wenige Teilungen und exakt gemeldete Zeiten
+
+- **Standardmäßig 12 Stunden** maximal je zusammenhängendem Dienst und je Helfer pro Tag. Im Formular weiter anpassbar.
+- Die Automatik bevorzugt **einen einzigen langen Dienst je Person und Tag** und berücksichtigt die Zeiträume der Anmeldungen. Bereits vorhandene Dienste bleiben unverändert.
+- Nur wenn nach der ersten Planung noch Bedarf besteht, können weitere getrennte Dienste in Betracht kommen; Lücken unter sechs Personen werden sichtbar ausgewiesen.
+- Bei jedem Vorschlag zeigt die Oberfläche direkt die **tatsächlich gemeldeten Uhrzeiten** der betreffenden Person.
+- Wird eine Person im Vorschlag geändert, passt sich das Zeitfenster nach Möglichkeit automatisch an die Verfügbarkeit der neu gewählten Person an (z. B. von 13–18 Uhr auf 16–21 Uhr bei einer 16–23-Uhr-Meldung).
+- Ungültige Zeiten werden markiert und verhindern das gemeinsame Speichern. Auch das Apps-Script-Backend prüft die Originalverfügbarkeit bei `saveAutoShifts`.
+- Testfälle: 12 Helfer ganztägig → 6 ungeteilte Dienste 13–23 Uhr; 6 Helfer erst ab 16 Uhr → ausschließlich Vorschläge ab 16 Uhr. Mit realen Anmeldungen wurden keine ungültigen Vorschläge und keine unnötigen Teilungen gefunden.
+
+Diese Änderung betrifft die `index.html`. Für das gemeinsame Speichern über `saveAutoShifts` muss weiterhin die aktuelle `Code.gs` als neue Apps-Script-Version bereitgestellt sein.

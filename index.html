@@ -917,6 +917,88 @@ function renderVisualPlan(){
 }
 /* WIP_VISUAL_PLAN_END */
 
+/* WIP_PRINT_PLAN_BEGIN – A4-Querformat. Nur aus einer angemeldeten Adminsitzung. */
+function visualPrintStatus(model){
+ var s=model.shifts||[];
+ if(!s.length)return 'Noch keine Dienste geplant';
+ if(s.some(function(x){return x.proposed}))return 'ENTWURF · inklusive noch nicht gespeicherter Vorschläge';
+ if(s.some(function(x){return !x.published}))return 'ENTWURF · nicht vollständig veröffentlicht';
+ return 'Fix veröffentlichter Dienstplan';
+}
+function visualPrintTable(model){
+ if(!model.shifts.length)return '<p class="print-empty">Für diesen Tag sind noch keine Dienste vorhanden.</p>';
+ var people={};(adminData.people||[]).forEach(function(p){people[p.id]=p});
+ var rows=model.shifts.slice().sort(function(a,b){return a.from.localeCompare(b.from)||a.to.localeCompare(b.to)||String(people[a.personId]?.name||'').localeCompare(String(people[b.personId]?.name||''),'de')});
+ return '<h3 class="print-section">Einzelne Dienste</h3><table class="print-table"><thead><tr><th>Helfer:in</th><th>Beginn</th><th>Ende</th><th>Bereich</th><th>Status</th></tr></thead><tbody>'+
+ rows.map(function(s){var p=people[s.personId],label=s.proposed?'Vorschlag':s.published?'Fix':'Gespeicherter Entwurf';
+  return '<tr><td>'+esc(p?p.name:'Unbekannt')+'</td><td>'+esc(s.from)+'</td><td>'+esc(s.to)+'</td><td>'+esc(s.role||'Käsehütte')+'</td><td>'+esc(label)+'</td></tr>';
+ }).join('')+'</tbody></table>';
+}
+function visualPrintSection(day){
+ var model=visualState(day.id),short=day.short+' 2026';
+ var statusText=visualPrintStatus(model);
+ var timeText=day.teardown?'Abbau ab 07:30 Uhr · tatsächliches Ende offen':day.start+'–'+day.end+' Uhr';
+ var legend='<div class="viz-legend"><span><i class="viz-dot viz-low"></i>0–3 Helfer</span><span><i class="viz-dot viz-mid"></i>4–5 Helfer</span><span><i class="viz-dot viz-good"></i>6 Helfer</span><span><i class="viz-dot viz-over"></i>Mehr als 6</span><span><i class="viz-dot" style="background:#d9a349"></i>Vorschlag</span></div>';
+ return '<section class="print-day"><div class="print-header"><span class="print-brand">WEIHNACHTEN IM PARK 2026 · GRINCH-KÄSEHÜTTE</span><h1>'+esc(day.name)+', '+esc(short)+'</h1><p>'+esc(timeText)+'</p><div class="print-status">'+esc(statusText)+'</div></div>'+
+ '<div class="print-body">'+legend+visualMapHtml(model)+
+ '<div class="print-handover">'+visualEventsHtml(model)+'</div>'+visualPrintTable(model)+
+ '<footer class="print-footer">Interne Einsatzplanung · Stand '+esc(new Date().toLocaleString('de-AT',{timeZone:'Europe/Vienna',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}))+' · Nicht zur öffentlichen Weitergabe</footer>'+
+ '</div></section>';
+}
+function visualPrint(days){
+ if(!adminKey||el('adminDashboard').hidden){status('plannerMessage','Nur im angemeldeten Verwaltungsbereich möglich.','bad');return}
+ var target=days.map(function(d){return DAYS.find(function(x){return x.id===d})}).filter(Boolean);
+ if(!target.length){status('plannerMessage','Keinen gültigen Tag zum Drucken ausgewählt.','bad');return}
+ var win=window.open('','_blank');
+ if(!win){status('plannerMessage','Die Druckansicht wurde vom Browser blockiert. Bitte Pop-ups für diese Seite erlauben.','bad');return}
+ var style=document.querySelector('style'),base=style?style.textContent:'';
+ var extra=String.raw`@page{size:A4 landscape;margin:11mm}html,body{margin:0!important;padding:0!important;background:#fff!important;color:#203d2c!important;font-family:Arial,Helvetica,sans-serif!important;font-size:11px}
+ .print-toolbar{padding:15px 20px;background:#102f20;color:white;display:flex;align-items:center;justify-content:space-between;gap:14px}
+ .print-toolbar button{background:#e7bb6a;color:#20341f;border:0;border-radius:7px;padding:11px 17px;font-size:14px;font-weight:800;cursor:pointer}
+ .print-day{page-break-after:always;break-after:page;background:#fff}
+ .print-day:last-child{page-break-after:auto;break-after:auto}
+ .print-header{background:#102f20;color:white;border-bottom:5px solid #ddaf54;padding:18px 22px}
+ .print-header h1{color:#fff;font-size:22px;line-height:1.15;margin:7px 0 2px}
+ .print-header p{font-size:11px;color:#d6e6d9;margin:0}
+ .print-brand{font-size:10px;letter-spacing:1.4px;color:#f4cd86;font-weight:900}
+ .print-status{font-size:10px;font-weight:bold;padding-top:7px;color:#f2d394}
+ .print-body{padding:11px 16px}
+ .viz-scroller{overflow:visible!important;max-width:none;border:1px solid #d9e3d7}
+ .viz-inner{min-width:0!important;width:100%;padding:9px}
+ .viz-line{grid-template-columns:128px minmax(0,1fr)}
+ .viz-label{font-size:9px}.viz-label small{font-size:8px}
+ .viz-helper-row{min-height:31px;padding:2px 0;break-inside:avoid}
+ .viz-helper-row .viz-track{height:25px}
+ .viz-bar{height:19px;top:3px;font-size:8px}
+ .viz-bar small{font-size:8px}
+ .viz-cover-strip,.viz-cover-strip span{height:24px}
+ .viz-metrics{gap:7px;margin:7px 0}
+ .viz-metrics span{font-size:10px;padding:6px 9px}
+ .viz-legend{margin:8px 0;font-size:10px}
+ .viz-handover{font-size:10px;padding:5px 0;break-inside:avoid}
+ .viz-handover strong{font-size:10px}
+ .print-section{font-size:13px;color:#244b35;margin:16px 0 8px;break-after:avoid}
+ .print-table{border-collapse:collapse;width:100%;font-size:10px;table-layout:fixed}
+ .print-table th{text-align:left;background:#e5eee2;padding:7px;color:#204631}
+ .print-table td{padding:6px 7px;border-bottom:1px solid #e1e8dd;overflow-wrap:anywhere}
+ .print-table tr{break-inside:avoid}
+ .print-table th:nth-child(1){width:27%}.print-table th:nth-child(2),.print-table th:nth-child(3){width:13%}
+ .print-table th:nth-child(4){width:26%}.print-table th:nth-child(5){width:21%}
+ .print-empty{font-size:11px;color:#758475}
+ .print-footer{margin-top:12px;border-top:1px solid #d9e4d8;text-align:right;font-size:9px;color:#708071;padding:8px 0 0}
+ @media print{.print-toolbar{display:none!important}.print-header,.viz-cover-strip span,.viz-bar,.viz-dot{print-color-adjust:exact!important;-webkit-print-color-adjust:exact!important}
+ .print-day{page-break-inside:auto}.viz-line,.print-table tr,.viz-handover{break-inside:avoid}.viz-scroller{break-inside:avoid}}
+ `;
+ var doc='<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Dienstplan Grinch-Käsehütte · Weihnachten im Park 2026</title><style>'+base+extra+'</style></head><body>'+
+ '<div class="print-toolbar"><strong>Grinch-Käsehütte · Interner Dienstplan</strong><button type="button" onclick="window.print()">🖨 Drucken / Als PDF speichern</button></div>'+
+ target.map(visualPrintSection).join('')+'</body></html>';
+ win.document.open();win.document.write(doc);win.document.close();win.focus();
+}
+el('visualPrintDay').addEventListener('click',function(){visualPrint([el('plannerDay').value])});
+el('visualPrintAll').addEventListener('click',function(){visualPrint(DAYS.map(function(d){return d.id}))});
+/* WIP_PRINT_PLAN_END */
+
+
 function renderPlanner(){
  var selected=el('plannerDay').value,day=DAYS.find(function(d){return d.id===selected})||DAYS[0];
  el('plannerMonday').hidden=!day.teardown;

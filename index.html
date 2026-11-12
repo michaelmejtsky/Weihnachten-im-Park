@@ -631,6 +631,72 @@ el('publicRotaDays').addEventListener('click',function(e){
 });
 /* WIP_PUBLIC_ROTA_END */
 
+/* Öffentliche Druckansicht: exakt derselbe veröffentlichte Datensatz wie in der Helferansicht. */
+function publicRotaPrint(){
+ if(!publicShifts.length)return;
+ var days=DAYS.filter(function(d){return publicShifts.some(function(s){return s.date===d.id})});
+ if(!days.length)return;
+ var popup=window.open('','_blank');
+ if(!popup){alert('Bitte Pop-ups erlauben, um den Dienstplan zu drucken.');return}
+ var sections=days.map(function(d){
+  var data=publicRotaData(d.id,publicShifts);
+  var entries=data.shifts.map(function(s){
+   return '<tr><td>'+esc(s.name)+'</td><td>'+esc(s.from)+'</td><td>'+esc(s.to)+'</td><td>'+esc(s.role||'Käsehütte')+'</td></tr>';
+  }).join('');
+  var hint=d.teardown?'Abbau ab 07:30 Uhr · Ende offen':d.start+'–'+d.end+' Uhr';
+  return '<section class="print-day"><header class="print-header"><span>WEIHNACHTEN IM PARK 2026 · GRINCH-KÄSEHÜTTE</span><h1>'+esc(d.name)+', '+esc(d.short.slice(4))+'.2026</h1><p>'+esc(hint)+'</p></header>'+
+    '<div class="print-body">'+publicRotaChartHtml(data)+
+    '<h2>Dienste im Überblick</h2><table><thead><tr><th>Name</th><th>Von</th><th>Bis</th><th>Bereich</th></tr></thead><tbody>'+entries+'</tbody></table></div>'+
+    '<footer class="print-footer">Nur fix veröffentlichte Dienste · Stand '+esc(new Date().toLocaleString('de-AT',{timeZone:'Europe/Vienna'}))+'</footer></section>';
+ }).join('');
+ var css=String.raw`@page{size:A4 landscape;margin:10mm}*{box-sizing:border-box}html,body{padding:0;margin:0;font-family:Arial,Helvetica,sans-serif;color:#203929;background:#fff}
+ .print-toolbar{display:flex;align-items:center;justify-content:space-between;gap:18px;background:#173c29;color:white;padding:13px 18px}
+ .print-toolbar button{font-size:13px;border:0;border-radius:8px;padding:10px 16px;background:#e7bc65;color:#1a3624;font-weight:800;cursor:pointer}
+ .print-day{page-break-after:always;break-after:page}
+ .print-day:last-of-type{page-break-after:auto;break-after:auto}
+ .print-header{background:#173c29;border-bottom:5px solid #e0b45b;color:white;padding:18px 22px}
+ .print-header span{font-size:10px;font-weight:850;letter-spacing:1.2px;color:#e7c777}
+ .print-header h1{font-size:22px;margin:6px 0 3px}
+ .print-header p{font-size:11px;color:#deebdf;margin:0}
+ .print-body{padding:12px 17px}
+ .public-rota-metrics{display:flex;gap:8px;margin:8px 0}
+ .public-rota-metrics span{font-size:10px;border:1px solid #dce7d9;border-radius:7px;padding:6px 8px}
+ .public-rota-scroll{width:100%;border:1px solid #dee9dc;border-radius:10px}
+ .public-rota-inner{width:100%;padding:10px 9px}
+ .public-rota-line{display:grid;grid-template-columns:140px minmax(0,1fr);gap:10px;align-items:center}
+ .public-rota-label{font-size:9px;font-weight:bold;color:#234d35;overflow-wrap:anywhere}
+ .public-rota-label small{display:block;font-size:8px;font-weight:normal;color:#6b776e;margin-top:2px}
+ .public-rota-track{height:25px;position:relative;background:#f3f7f1;border-radius:5px}
+ .public-rota-axis{height:22px;background:transparent;margin-bottom:5px;border-bottom:1px solid #e2e7e0}
+ .public-rota-axis span{position:absolute;top:0;transform:translateX(-50%);font-size:9px;color:#728173}
+ .public-rota-axis span.first{transform:none}.public-rota-axis span.last{transform:translateX(-100%)}
+ .public-rota-band{display:flex;gap:1px;height:21px}
+ .public-rota-band span{display:flex;flex:1 1 0;align-items:center;justify-content:center;min-width:0;border-radius:3px;font-size:9px;color:#376244;background:#e9f0e4}
+ .public-rota-band span.occupied{background:#e0efdb;color:#276f42}.public-rota-band span.busy{background:#90c79d;color:#1b4d30}.public-rota-band span.full{background:#4b9563;color:#fff}
+ .public-rota-shift{padding:3px 0;border-bottom:1px solid #e6ece3;break-inside:avoid}
+ .public-rota-guide{position:absolute;inset:0}.public-rota-guide i{position:absolute;inset-block:0;border-left:1px dashed #e0e7dd}
+ .public-rota-bar{position:absolute;top:4px;height:18px;min-width:2px;background:#398258;border-radius:4px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+ .public-rota-bar small{font-size:8px;color:white;font-weight:bold;white-space:nowrap}
+ .public-rota-scroll-hint{display:none}
+ .public-rota-changes{margin:9px 0}.public-rota-changes h4{font-size:12px;margin:5px 0}
+ .public-rota-change{display:grid;grid-template-columns:62px 1fr;gap:8px;font-size:10px;border-top:1px solid #e5e9e2;padding:4px 0;break-inside:avoid}
+ .public-rota-change strong{font-weight:bold}.public-rota-change span{display:block;color:#54745c}
+ .print-body h2{font-size:13px;margin:12px 0 7px}
+ table{width:100%;border-collapse:collapse;font-size:10px}
+ th{text-align:left;background:#e6eee2;color:#2c573b;padding:7px}
+ td{border-bottom:1px solid #e3e9e0;padding:6px 7px;overflow-wrap:anywhere}
+ tr{break-inside:avoid}
+ .print-footer{font-size:9px;color:#6f7c72;padding:0 17px 12px;text-align:right}
+ @media print{.print-toolbar{display:none}.print-header,.public-rota-bar,.public-rota-band span{print-color-adjust:exact;-webkit-print-color-adjust:exact}section,table{break-inside:auto}}
+ `;
+ var html='<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Veröffentlichter Dienstplan · Grinch-Käsehütte 2026</title><style>'+css+'</style></head>'+
+ '<body><div class="print-toolbar"><strong>🎄 Veröffentlichter Dienstplan</strong><button type="button" onclick="window.print()">🖨️ Drucken / Als PDF speichern</button></div>'+
+ sections+'</body></html>';
+ popup.document.open();popup.document.write(html);popup.document.close();popup.focus();
+}
+el('publicRotaPrint').addEventListener('click',publicRotaPrint);
+
+
 async function loadPlan(){
  el('planList').innerHTML='<div class="empty">Der veröffentlichte Plan wird geladen …</div>';
  el('publicRota').hidden=true;

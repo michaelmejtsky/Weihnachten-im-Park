@@ -540,16 +540,116 @@ el('copyPrivate').addEventListener('click',async function(){
  try{await navigator.clipboard.writeText(url);alert('Dein persönlicher Bearbeitungslink wurde kopiert. Bitte nicht öffentlich teilen.')}
  catch(e){prompt('Dein persönlicher Link (privat aufbewahren):',url)}
 });
+
+/* WIP_PUBLIC_ROTA_BEGIN – ausschließlich vom öffentlichen „public“-Endpunkt gelieferte Daten */
+var publicShifts=[],publicRotaSelectedDay='';
+function publicRotaData(date,all){
+ var day=DAYS.find(function(d){return d.id===date});
+ if(!day)return null;
+ var shifts=(all||[]).filter(function(s){return s.date===date&&Number.isFinite(planMinutes(s.from))&&Number.isFinite(planMinutes(s.to))&&planMinutes(s.from)<planMinutes(s.to)})
+ .slice().sort(function(a,b){return a.from.localeCompare(b.from)||a.to.localeCompare(b.to)||String(a.name).localeCompare(String(b.name),'de')});
+ var from=planMinutes(day.start),end=day.teardown?(shifts.length?Math.max.apply(null,shifts.map(function(s){return planMinutes(s.to)})):from+60):planMinutes(day.end);
+ if(end<=from)end=from+60;
+ var bounds={from:from,to:end},times=new Set([from,end]);
+ for(var t=Math.ceil(from/30)*30;t<end;t+=30)times.add(t);
+ shifts.forEach(function(s){
+  times.add(Math.max(from,Math.min(end,planMinutes(s.from))));
+  times.add(Math.max(from,Math.min(end,planMinutes(s.to))));
+ });
+ var ticks=Array.from(times).sort(function(a,b){return a-b});
+ var parts=[];
+ for(var i=0;i<ticks.length-1;i++){
+  var a=ticks[i],b=ticks[i+1];
+  if(b>a)parts.push({from:a,to:b,count:shifts.filter(function(s){return planMinutes(s.from)<=a&&planMinutes(s.to)>a}).length});
+ }
+ var eventMap=new Map();
+ shifts.forEach(function(s){
+  [['begin',planMinutes(s.from)],['end',planMinutes(s.to)]].forEach(function(pair){
+   var event=eventMap.get(pair[1])||{time:pair[1],begin:[],end:[]};
+   event[pair[0]].push(s.name);
+   eventMap.set(pair[1],event);
+  });
+ });
+ var events=Array.from(eventMap.values()).sort(function(a,b){return a.time-b.time});
+ return {date:date,day:day,shifts:shifts,bounds:bounds,parts:parts,events:events};
+}
+function publicRotaPercent(minute,bounds){
+ return Math.max(0,Math.min(100,(minute-bounds.from)*100/(bounds.to-bounds.from)));
+}
+function publicRotaChartHtml(data){
+ if(!data||!data.shifts.length)return '<div class="public-rota-empty">Für diesen Tag gibt es noch keine fix veröffentlichten Dienste.</div>';
+ var bounds=data.bounds,marks=[bounds.from],last=bounds.to;
+ for(var t=Math.ceil(bounds.from/60)*60;t<last;t+=60)if(t>bounds.from)marks.push(t);
+ if(marks[marks.length-1]!==last)marks.push(last);
+ var axis='<div class="public-rota-line"><div class="public-rota-label">Uhrzeit</div><div class="public-rota-track public-rota-axis">'+marks.map(function(t,i){
+  return '<span class="'+(i===0?'first':i===marks.length-1?'last':'')+'" style="left:'+publicRotaPercent(t,bounds).toFixed(3)+'%">'+esc(planClock(t))+'</span>';
+ }).join('')+'</div></div>';
+ var guides='<div class="public-rota-guide">'+marks.filter(function(x){return x>bounds.from&&x<last}).map(function(t){
+  return '<i style="left:'+publicRotaPercent(t,bounds).toFixed(3)+'%"></i>';
+ }).join('')+'</div>';
+ var cover='<div class="public-rota-line"><div class="public-rota-label">Gleichzeitig im Dienst<small>Veröffentlichte Dienste</small></div><div class="public-rota-band">'+data.parts.map(function(p){
+  var klass=p.count>=6?'full':p.count>=3?'busy':p.count>0?'occupied':'';
+  return '<span class="'+klass+'" style="flex:'+Math.max(1,p.to-p.from)+' 1 0" title="'+esc(planClock(p.from)+'–'+planClock(p.to)+': '+p.count+' Dienste gleichzeitig')+'">'+((p.to-p.from)>=30?p.count:'')+'</span>';
+ }).join('')+'</div></div>';
+ var rows=data.shifts.map(function(s){
+  var start=Math.max(bounds.from,planMinutes(s.from)),end=Math.min(bounds.to,planMinutes(s.to));
+  var title=String(s.name)+' · '+s.from+'–'+s.to+' Uhr · '+String(s.role||'Käsehütte');
+  return '<div class="public-rota-line public-rota-shift"><div class="public-rota-label">'+esc(s.name)+'<small>'+esc(s.role||'Käsehütte')+' · '+esc(s.from)+'–'+esc(s.to)+'</small></div>'+
+    '<div class="public-rota-track">'+guides+'<div class="public-rota-bar" title="'+esc(title)+'" style="left:'+publicRotaPercent(start,bounds).toFixed(3)+'%;width:'+
+    Math.max(0,publicRotaPercent(end,bounds)-publicRotaPercent(start,bounds)).toFixed(3)+'%"><small>'+esc(s.from)+'–'+esc(s.to)+'</small></div></div></div>';
+ }).join('');
+ var changes=data.events.map(function(ev){
+  return '<div class="public-rota-change"><strong>'+esc(planClock(ev.time))+'</strong><div>'+
+   (ev.begin.length?'<span><b>↑ Beginn:</b> '+esc(ev.begin.join(', '))+'</span>':'')+
+   (ev.end.length?'<span><b>↓ Ende:</b> '+esc(ev.end.join(', '))+'</span>':'')+'</div></div>';
+ }).join('');
+ var endLabel=data.day.teardown?' · Abbauende offen':'';
+ return '<div class="public-rota-metrics"><span>'+data.shifts.length+' veröffentlichte Dienste</span><span>'+esc(data.day.name)+' · '+esc(planClock(bounds.from))+'–'+esc(planClock(bounds.to))+' Uhr'+esc(endLabel)+'</span></div>'+
+ '<div class="public-rota-scroll"><div class="public-rota-inner">'+axis+cover+rows+'</div></div>'+
+ '<p class="public-rota-scroll-hint">↔ Auf dem Handy kannst du die Grafik seitlich verschieben.</p>'+
+ '<div class="public-rota-changes"><h4>🕒 Dienstbeginn & Dienstende</h4>'+changes+'</div>';
+}
+function publicRotaRender(){
+ var available=DAYS.some(function(d){return publicShifts.some(function(s){return s.date===d.id})});
+ el('publicRota').hidden=!available;
+ if(!available)return;
+ if(!DAYS.some(function(d){return d.id===publicRotaSelectedDay}))
+  publicRotaSelectedDay=(DAYS.find(function(d){return publicShifts.some(function(s){return s.date===d.id})})||DAYS[0]).id;
+ el('publicRotaDays').innerHTML=DAYS.map(function(d){
+  var count=publicShifts.filter(function(s){return s.date===d.id}).length,active=d.id===publicRotaSelectedDay;
+  return '<button type="button" data-publicdate="'+d.id+'" class="'+(active?'active':'')+'" aria-pressed="'+(active?'true':'false')+'"><strong>'+esc(d.short)+' · 2026</strong><small>'+count+' Dienst'+(count===1?'':'e')+(d.teardown?' · Abbau':'')+'</small></button>';
+ }).join('');
+ el('publicRotaDisplay').innerHTML=publicRotaChartHtml(publicRotaData(publicRotaSelectedDay,publicShifts));
+}
+el('publicRotaDays').addEventListener('click',function(e){
+ var button=e.target.closest('[data-publicdate]');
+ if(!button)return;
+ var value=button.dataset.publicdate;
+ if(!DAYS.some(function(d){return d.id===value}))return;
+ publicRotaSelectedDay=value;
+ publicRotaRender();
+});
+/* WIP_PUBLIC_ROTA_END */
+
 async function loadPlan(){
  el('planList').innerHTML='<div class="empty">Der veröffentlichte Plan wird geladen …</div>';
+ el('publicRota').hidden=true;
  try{
   var r=await call('public',{}),arr=(r.plan||[]).map(normalShift);
-  if(!arr.length){el('planList').innerHTML='<div class="empty">Der fixe Dienstplan ist noch nicht veröffentlicht. Trag gerne schon deine verfügbaren Zeiten ein! 🎄</div>';return}
-  el('planList').innerHTML=DAYS.map(function(d){var items=arr.filter(function(s){return s.date===d.id});
+  // Wichtig: Nur Werte des öffentlichen Endpunkts verwenden – keine Admin-Entwürfe.
+  publicShifts=arr.filter(function(s){return DAYS.some(function(d){return d.id===s.date})});
+  if(!publicShifts.length){
+   el('planList').innerHTML='<div class="empty">Der fixe Dienstplan ist noch nicht veröffentlicht. Trag gerne schon deine verfügbaren Zeiten ein! 🎄</div>';
+   return;
+  }
+  if(!publicShifts.some(function(s){return s.date===publicRotaSelectedDay}))
+   publicRotaSelectedDay=(DAYS.find(function(d){return publicShifts.some(function(s){return s.date===d.id})})||DAYS[0]).id;
+  publicRotaRender();
+  el('planList').innerHTML=DAYS.map(function(d){var items=publicShifts.filter(function(s){return s.date===d.id});
    return '<div class="card"><div class="spaced"><h3>'+esc(d.name)+', '+esc(d.short.slice(4))+'.2026</h3><span class="pill">'+items.length+' Dienste</span></div>'+
    (items.length?items.map(function(s){return '<div class="planentry"><strong>'+esc(s.from)+'–'+esc(s.to)+' Uhr</strong><span>'+esc(s.name)+'</span><span>'+esc(s.role)+'</span></div>'}).join(''):'<p class="mini">Noch keine fixen Einteilungen.</p>')+'</div>'
   }).join('');
- }catch(ex){el('planList').innerHTML='<div class="notice bad">'+esc(ex.message)+'</div>'}
+ }catch(ex){publicShifts=[];el('publicRota').hidden=true;el('planList').innerHTML='<div class="notice bad">'+esc(ex.message)+'</div>'}
 }
 el('refreshPlan').addEventListener('click',loadPlan);
 async function loadAdmin(){

@@ -125,3 +125,18 @@ Im Admin-Bereich **Verwaltung → Planungszentrale → Visuelle Dienstkarte** we
 - Die Grafik und die vollständige Druckversion sind **ausschließlich im geschützten Adminbereich** verfügbar. Keine private Telefonnummer wird mit ausgegeben. Entwürfe werden deutlich markiert und **nicht** durch Drucken automatisch veröffentlicht.
 
 Diese Version benötigt **keine neue Apps-Script-Bereitstellung** für die rein visuelle Darstellung oder den lokalen Browser-Druck. Für das **gemeinsame Speichern** neuer Vorschläge gilt weiterhin die Voraussetzung, dass die aktuelle `Code.gs` bereitgestellt ist.
+
+
+## Öffentliche grafische Dienstübersicht (nach Veröffentlichung)
+
+Die Teilnehmerseite **📅 Dienstplan** zeigt nach dem Veröffentlichen zusätzlich zur bisherigen Liste eine übersichtliche Zeitgrafik:
+
+- Tagwahl für Fr 04.12. bis Mo 07.12.2026; beim Montag ist das tatsächliche Abbauende weiterhin offen.
+- Ein grüner Balken je **veröffentlichtem** Dienst mit Name (nur gemäß ausdrücklicher Namensfreigabe, sonst „Helfer:in“), Uhrzeit und Bereich.
+- Zeitabhängige Darstellung, wie viele **veröffentlichte Dienste gleichzeitig** laufen, sowie kompakte Wechselübersicht („Beginn/Ende“). Keine internen Sollbesetzungswarnungen.
+- Für Mobilgeräte seitlich scrollbar; bisherige vollständige Liste aller veröffentlichten Dienste bleibt darunter erhalten.
+- Über **„🖨️ Plan drucken“** können Helfer eine A4-Querformat-Druckansicht aller Tage mit veröffentlichten Diensten und der Zeitgrafik öffnen; zum Erstellen einer PDF-Datei dort den Browserdruck **„Als PDF speichern“** verwenden.
+- Die Grafik verarbeitet nur `call('public',{})` bzw. `wipPublic_()`. Entwürfe, die nicht veröffentlichte Personalplanung, private Notizen, Telefonnummern und interne Verfügbarkeiten bleiben unsichtbar.
+- Wenn noch nichts veröffentlicht ist, erscheint nur die bisherige Information, dass noch kein fixer Dienstplan veröffentlicht wurde.
+
+Die Änderung betrifft ausschließlich `index.html`; es ist **keine neue Apps-Script-Bereitstellung** für die öffentliche Visualisierung nötig. Der bestehende Apps-Script-Endpunkt muss natürlich bereits korrekt laufen.
